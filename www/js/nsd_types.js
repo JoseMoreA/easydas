@@ -1,0 +1,128 @@
+/**Definition of the Step "Upload" from the new source dialog*/
+
+
+(function() {
+	//Private Attributes
+	var panel;
+	var label = "Types";
+	var id = 'types';
+	
+	var ontology = 'SO';
+
+	var dialog;
+	
+	var typeSelector = easyDAS.ontologyPicker(ontology); //a reference to the ontologyPicker
+	
+	//DOM REFS
+	var types_table;
+	
+	//Private Methods
+	var createPanel = function() {
+		panel = $('<div class="body"/>');
+		
+		var fs = $('<fieldset class="types"><legend alt="Assign ontology terms to types">Feature Types</legend></fieldset>').appendTo(panel);
+		//create an interface to add the types information
+		types_table = $('<table class="preview_table types_table">');
+		types_table.append('<thead><tr><th colspan=2>Identifier</th><th>Label</th><th>CV Id</th></tr></thead>');
+		var tbody = $('<tbody />').appendTo(types_table);
+		
+		var data = dialog.metadata.types;
+		for (var nline = 0, ndata = data.length; nline < ndata; nline++) {
+			tbody.append(typeHTML(data[nline]));
+		}
+
+		//Append the defaults type_info, if any
+		var defs = dialog.metadata.defaults;
+		for(var idef = 0, ldef=defs.length; idef<ldef; idef++) {
+			var def = defs[idef];
+			if(def.field == 'type_id') {
+				tbody.append(typeHTML({id: def.value}));
+			}
+		}
+
+		//and append the table
+		fs.append(types_table);
+		
+		//initialize the "edit" buttons
+		$('.edit_type', types_table).live('click', function(event, element){
+			var type_row = $(event.target).parent().parent();
+			type_row.addClass("selected");
+			var type = getTypeInfo(type_row);
+			var buttonOffset = $(event.target).offset();
+			typeSelector.setPosition(buttonOffset.left + 10, buttonOffset.top + 5);
+			typeSelector.select(type, function(type){
+				setTypeInfo(type_row, type)
+				type_row.removeClass("selected");
+			});
+			return false;
+		});
+	};
+	
+	var typeHTML = function(type){
+		var row = $('<tr />');
+		row.append('<td><span class="type_id" >' + type.id + '</span></td>');
+		row.append('<td class="no_left_border"><div class="edit_button edit_type" /></td>');
+		row.append('<td class="fixed_width_10em"><span class="type_label">' + (type.label || '') + '</span></td>')
+		row.append('<td class="fixed_width_10em"><span class="type_cvId">' + (type.cvId || '') + '</span></td>')
+		return row;
+	};
+	
+	/**This function collects the info for a type from the types table.
+	 *
+	 * @param {Object} type_row - a jQuery object "pointing" at the row in the types table
+	 */
+	var getTypeInfo = function(type_row){
+		return {
+			name: type_row.find('.type_id').text(),
+			label: type_row.find('.type_label').text(),
+			cvId: type_row.find('.type_cvId').text()
+		}
+	};
+	/**This function sets the info for a type from the types table.
+	 *
+	 * @param {Object} type_row - a jQuery object "pointing" at the row in the types table
+	 * @param {Object} type_info - an object containingn the info for the type (name, label and cvId)
+	 */
+	var setTypeInfo = function(type_row, type_info){
+		type_row.find('.type_id').text(type_info.name);
+		type_row.find('.type_label').text(type_info.label);
+		type_row.find('.type_cvId').text(type_info.cvId);
+	};
+	
+	var self = {
+		//Public Attributes
+		
+		
+		//Public Methods
+		id: function() {
+			return id;
+		},
+		label: function() {
+			return label;
+		},
+		getPanel: function(_dialog) {
+			if(!panel) {
+				dialog = _dialog;
+				createPanel();
+				
+			}
+			return panel;
+		},
+		initPanel: function(metadata) {
+			
+		},
+		getPanelData: function(){
+			var new_types = [];
+			$('tbody tr', types_table).each(function(i, el){
+				new_types.push({
+					"id": $('.type_id', el).text(),
+					"label": $('.type_label', el).text(),
+					"cvId": $('.type_cvId', el).text()
+				})
+			});
+			dialog.metadata.types = new_types;
+		}
+	}
+	
+	easyDAS.NewSourceDialog.Steps[id] = self;
+}());

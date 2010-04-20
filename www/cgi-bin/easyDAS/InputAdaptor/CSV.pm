@@ -1,0 +1,562 @@
+#########
+# Author:        Bernat Gel
+# Maintainer:    Bernat Gel
+# Created:       2009-12-03
+#
+# This is a specialized InputAdaptor for CSV and similar file formats. 
+#
+# 
+
+
+
+package easyDAS::InputAdaptor::CSV;
+
+use strict; 
+use warnings;
+
+use File::stat;
+use Carp;
+use Clone::Fast qw(clone);
+
+use Data::Dumper;
+
+use Parse::CSV;
+
+use easyDAS::DBInterface;
+use easyDAS::Data::Feature;
+
+
+use base qw(easyDAS::InputAdaptor);
+
+#DEFINES
+my $LARGEST_TEST_FILE = 4000000; #4MB - the size of the largest file to test completely
+my $PARSER_ID = 'CSV';
+
+sub init {
+  my ($self, $config) = @_;
+
+  #Set the expected file extensions
+  my @file_exts = ('csv', 'tsv', 'dat', 'txt');
+  $self->{'file_extensions'} = \@file_exts;
+  $self->{'field_separators'} = [',', ';', '	', ':']; #the TAB character is just a real 'TAB'
+  $self->{'error_message'} = "";
+  
+ # $self->{'debug'} = 0; #OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+  
+  print "(ed::IA::CSV-init): initializing CSV. filename=".$self->metadata->file_id."   original_filename=".$self->metadata->original_filename."   extension=".$self->metadata->extension."<br><br>\n" if($self->debug); 
+  
+}
+
+
+##################GETTERS/SETTERS#####################################################
+sub parsed_data {
+   my ($self, $value) = @_;
+   $self->{'parsed_data'} = $value if (defined $value);
+   return $self->{'parsed_data'};
+}
+
+
+=head4 get_parsing_metadata
+
+ Function  : Returns a valid parsing metadata. Creates or adapts it if necessary
+ Arguments : 
+ Returns   : $metadata
+ 
+=cut
+sub get_parsing_metadata {
+  my ($self) = @_;
+  
+  my $meta = $self->metadata;
+
+  if($meta->parsing) {# IF the FileMetadata has a parsing section
+      if($meta->parsing->{'parser_type'} && $meta->parsing->{'parser_type'} eq $PARSER_ID) { #IF the parsing section is of type CSV
+	  return $meta->parsing;
+      } #else, continue
+  }
+  #if arrived here, we don't have a valid parsing section. Create one
+  #WARNING: WHAT IF the user forced the cuurent parsing type? We should not be here!!!
+  $meta->parsing($self->create_parsing_metadata);
+  return $meta->parsing;
+}
+
+=head4 create_parsing_metadata
+
+ Function  : creates a parsing metadata section for the GFF format
+ Arguments : 
+ Returns   : $metadata
+
+=cut
+sub create_parsing_metadata {
+  my ($self) = @_;
+  
+  my %parsing = (
+    parser_type => $PARSER_ID,
+    parser => "easyDAS::InputAdaptor::".$PARSER_ID,
+    parser_parameters => {},
+    data => [],
+    num_data_lines => 5,
+    data_fields => $self->get_data_fields(),
+    attribute_names => {},
+    mapping => $self->get_default_mapping(),
+    first_data_line =>1,
+    skip_comments => 1
+  );
+  return \%parsing;
+}
+
+=head4 get_default_mapping
+
+ Function  : returns the default mapping of columns to easyDAS fields. Since CSV have no structure assumed, return an empty array;
+ Arguments : 
+ Returns   : $score, a score for the probability of this file being a GFF. 0 for BEING a gff, 100 for completely NOT being a gff.
+ 
+=cut
+sub get_default_mapping {
+  return [];
+}
+
+sub get_data_fields {
+  my ($self) = @_;
+  return [];
+}
+
+################## "REAL" METHODS ###################################################
+=head4 test
+
+ Function  : Tests the file associated with this adaptor to determine if its a GFF file.
+ Arguments : 
+ Returns   : $score, a score for the probability of this file being a GFF. 0 for BEING a gff, 100 for completely NOT being a gff.
+ 
+=cut
+sub test {
+  my ($self) = @_;
+
+  print "(ia::CSV-test): Start testing for CSV format<br><br>\n" if($self->debug);
+
+  $self->reset_error_score();
+  $self->reset_types();
+  
+  my $fileExt = $self->checkFileExtension();
+  if(!$fileExt) {
+    $self->add_error_score(40);
+  }
+
+  #open the data file
+  my $fh = undef;
+  $fh = $self->_fh();
+  
+  #create, if necessary, the parsing metadata
+  $self->get_parsing_metadata();
+
+  #detect and skip the comments
+  if($self->metadata->parsing->{'skip_comments'}) {
+    print qq(Skipping Comments<br>\n) if($self->debug);
+    my $line_num = 0;
+    my $data_found = 0;
+    my $line;
+    while(($line = <$fh>) && ++$line_num && !$data_found) {
+      chomp($line); #remove any trailing space and newlines
+      if($line =~ /^#/ || $line =~ /^%/) { #TODO: Enable variable comment markers (#, %, ')
+        print qq(Comment in line $line_num: $line<br>\n) if($self->debug); 
+      } else {
+	$data_found = 1;
+      }
+    }
+    $line_num -= 1;
+    print qq(Fist data line found: $line_num<br>\n) if($self->debug);
+    $self->metadata->parsing->{'first_data_line'} = $line_num;
+  }
+
+  #First: get the right separator
+  my $separator = $self->get_separator();
+  
+  if(!$separator) {
+    $self->metadata->parsing->{'format_score'} = 0;
+    print qq(The file is not a CSV. Not suitable separator was found.<br>\n) if($self->debug);
+    return 100;
+  } else {
+    print "The best separator found is: $separator\n" if($self->debug);
+    $self->metadata->parsing->{'separator'} = $separator;
+  }
+  
+  my $parser = Parse::CSV->new(handle => $fh, sep_char => $separator);
+  my $line;
+  #Add the column names
+  if(!scalar @{$self->metadata->parsing->{'data_fields'}}) { #if the column names are not specified, do it
+    $self->add_column_names($parser);
+    $self->guess_mapping(); #use the column names to try to guess a mapping
+  } elsif($self->metadata->parsing->{'has_headers'}) { #else, if the file has headers, just skip that line
+    $parser->fetch(); #so consume the line
+  }
+      
+  #Traverse the file
+  my $max_data_lines = $self->metadata->parsing->{'num_data_lines'}; #the number of data lines used to detect if the file is a valid GFF
+  my $num_data_lines = 0;
+  my $all_valid = 1; #assume its true if it doesn't fail
+
+  my $line_num =0;
+  my $file_size = $self->file_size();
+
+  print qq(Going to test the data lines<br>\n) if($self->debug);
+
+  #walk the file line by line until max_data_lines lines of data have been found or the entire file has been tested if file_size<LARGEST_TEST_FILE
+  LINE: while(($num_data_lines<$max_data_lines || $file_size<$LARGEST_TEST_FILE) && ($line = $parser->fetch()) && ++$line_num) {
+	print qq(Testing line $line_num<br>\n) if($self->debug);
+	print "The Data Line line is: ".Dumper($line)."\n" if($self->debug);
+	if($num_data_lines<$max_data_lines) {
+	  my $d =$self->metadata->parsing->{'data'}; #Store the line in metadata to be shown in the mapping table
+	  push(@$d, $self->trim_data_line($line)); #store the data read from that line, trimming the fields to remove any problematic content
+	  $num_data_lines++;
+	}
+	$self->extract_extended_info($line);
+  }
+  $all_valid = 0 if($parser->errstr); #if there was a parsing error, this is not a valid file
+  $self->add_error_score(100) if(!$all_valid); #if not all tested lines are valid, the file is not valid
+  
+  $self->metadata->parsing->{'format_score'} = 100 - $self->normalized_error_score();
+
+  print qq(The final score for the file is: ).$self->error_score()."<br>\n" if($self->debug);
+  print qq(And error messages are: ).$self->error_message()."<br>\n" if($self->debug);
+  print qq(<br>The metadata after test is: ).Dumper($self->metadata)."<br>\n" if($self->debug);
+
+  return $self->normalized_error_score();
+}
+
+=head4 create_source
+
+ Function  : Modifies the database tied to the DBInterface to add a new source based on the information on the file. 
+             This function does NOT test for the validity of the data, metadata and file format. This MUST be done using the test function.
+ Arguments : $DB - an easyDA::DBInterface opened and ready to work
+ Returns   : $metadata - the given metadata with the source creation information added.
+ 
+=cut
+sub create_source {
+  my ($self, $DB) = @_;
+
+  my $parsed_data = {
+    'features'	=> [],
+    'types'	=> [],
+    'methods'	=> [],
+    'links'	=> [],
+    'notes'	=> [],
+    'parents'	=> [],
+    'parts'	=> [],
+    'segments'	=> []
+  };
+
+  $self->parsed_data($parsed_data);  #initialize the parsed data to "nothing"
+  $self->parse();
+  $DB->create_source($self->metadata, $self->parsed_data);
+  
+  return $self->metadata;
+}
+
+
+########################  TESTING FUNCTIONS ##########################
+sub get_separator {
+  my ($self) = @_;
+  if($self->metadata->parsing->{'separator'} && $self->metadata->parsing->{'forced_separator'}) {
+    return $self->metadata->parsing->{'separator'};
+  } else {
+    my $fh = $self->_fh();
+    my $sep;
+    #We want to return with the fh exactly in the same position, so we'll use tell and seek
+    my $position = tell($fh);
+
+    #if the separator have not been forced by the user, test the data to find it
+    SEPARATOR: for $sep (@{$self->{'field_separators'}}) {
+      print "Testing separator: $sep\n" if($self->debug);
+      seek($fh, 0, 0);
+
+      my $parser = Parse::CSV->new(handle => $fh,sep_char   => $sep);
+      $self->skip_lines($parser); #WARN: This could be done faster by storing the bytes after skipping by lines only once
+
+      my $valid=1;
+      my $line = $parser->fetch();
+	
+      if ( $parser->errstr ) {
+	print "Error String is: ".$parser->errstr."\n";
+      }
+
+      print "The first line is: ".Dumper($line)."\n" if($self->debug);
+      if(!$line) {
+        print "There was a parsing error (or end of file!): ".$parser->errstr()."\n" if($self->debug);
+      } else {
+        my $num_fields = scalar @{$line};
+        if($num_fields > 1) {
+          for (my $i = 0; $i < 9 && $valid; $i++) {
+              $line = $parser->fetch();
+              $valid &= ((!$line && !$parser->errstr) || #End of file reached
+			 ($line  && ((scalar @{$line}) == $num_fields)));  #or the line splits in the right number of fields
+          }
+          if($valid) {
+            $self->metadata->parsing->{'separator'} = $sep;
+	    $self->metadata->parsing->{'num_fields'} = $num_fields;
+	    print "A separator ($sep) has been found. It splits every line in ($num_fields) fields." if($self->debug);
+	    last SEPARATOR;
+          }
+        }
+      }
+    }
+    print "Ended testing for separator. Returning (".$self->metadata->parsing->{'separator'}.")" if($self->debug);
+    seek($fh, $position, 0); #move the filehandle to the inital position
+    return $self->metadata->parsing->{'separator'};
+  }
+  return; #will never get executed
+}
+
+#Gets the column names (headers) and sets them in the parsing->{'data_fields'}
+sub add_column_names {
+  my ($self, $parser) = @_;
+  $self->metadata->parsing->{'has_headers'} = $self->test_has_headers() if(!defined $self->metadata->parsing->{'has_headers'});
+
+
+  if($self->metadata->parsing->{'has_headers'}) {
+    my $line = $parser->fetch();
+   
+    print "The headers line is: ".Dumper($line)."\n" if($self->debug);
+    my $ncol = 1;
+    for my $col (@{$line}) {
+      push( @{$self->metadata->parsing->{'data_fields'}}, {name=>$col, id=>"column_".$ncol}); 
+      $ncol += 1;
+    }
+  } else {
+    for(my $i=1; $i<=$self->metadata->parsing->{'num_fields'}; $i++) {
+      push( @{$self->metadata->parsing->{'data_fields'}}, {name=>"Column ".$i, id=>"column_".$i}); 
+    }
+  }
+}
+
+##Test if the file SEEMS to have headers on the first data line.
+# Some heuristics are applied:
+#    -> All fields are text
+#    -> Some fields are text while in other rows can be parsed to numbers
+#    -> Have words of a list: "Id", "Start", "End", ...
+sub test_has_headers {
+  my ($self) = @_;
+  print qq(Testing headers<br>\n) if($self->debug);
+  return if(!$self->metadata->parsing->{'separator'});
+  my $fh = $self->_fh;
+  my $position = tell($fh);
+
+  seek($fh, 0, 0);
+  my $parser = Parse::CSV->new(handle => $fh, sep_char => $self->metadata->parsing->{'separator'});
+  $self->skip_lines($parser); 
+  my $line1 = $parser->fetch();
+  my $line2 = $parser->fetch();
+  print qq(Lines:<br>\n\t ).Dumper($line1).qq(<br>\n\t ).Dumper($line2).qq(<br>\n) if($self->debug);
+  my $has_header;
+  if($line1 && $line2) {
+    my $numfields = scalar @{$line1};
+    for(my $i=0; $i<$numfields && !$has_header; $i +=1) {
+	$has_header |= (@{$line1}[$i] !~ /^(\d)+$/) && (@{$line2}[$i] =~ /^(\d)+$/); #if a field is non-numeric in the first line but numeric in the second, it could be a header
+    }
+  }
+  
+  seek($fh, $position, 0);
+	#BUG: This seek SHOULD leave us at the beginning of the headers line/first data line (if no headers)
+        #     but seems to leave us two lines later. Something strange happening
+
+
+ #Due to this problem  we are not positioned at the beginnning of the headers line. So, simply move to there  
+  seek($fh, 0, 0);
+  $self->skip_lines($parser);
+
+
+  print "The File ".($has_header?'has':'dosen\'t have')." headers<br>\n" if($self->debug);
+  return $has_header;
+}
+
+
+#########################  PARSING FUNCTIONS #######################################################
+sub parse {
+  my ($self) = @_;
+
+  print "(ia::CSV-parse): Start Parsing...<br><br>\n" if($self->debug);
+
+  my $separator = $self->get_separator();
+  if(!$separator) {
+    $self->metadata->{'error'} = {'id' => 'separator_required', 'msg' => 'A separator is required to parse CSV files and it was not possible to find it automatically. Please, provide one in the form'};
+    return $self->metadata;
+  }
+  my $fh = $self->_fh;
+  my $parser = Parse::CSV->new(handle => $fh, sep_char => $separator);
+  $self->skip_lines($parser);
+  
+  #if the file has a header, skip that line_info
+  $parser->fetch() if($self->metadata->parsing->{'has_headers'});
+  #Traverse the file
+  
+  my $line_num = 0;
+  my $line;
+  #walk the file line by line, parsing its info and storing in $parsed_data. Stop if we arrive to a FASTA directive
+  LINE: while(($line = $parser->fetch())  && ++$line_num) {	
+	my $feat = $self->parseDataLine($line, $line_num);
+	$self->apply_defaults($feat);
+#This is not a bad idea.... but fails somewhere.. wouldn't it be better to treat it at client level? AND if ignoring anything... take note of it and tell the user!!!!!
+# 	if(!$feat->complete()) {
+# 	  if($self->metadata->parsing->{'ignore_incomplete_features'}) {
+# 	    next LINE;
+# 	  } else {
+# 	      $self->metadata->{'error'} = {id=>'incomplete_features', msg=>'An incomplete feature was found. Please, use the "Defaults" tab to specify it completely'};
+# 	      return $self->metadata;
+# 	  }
+# 	}
+	push(@{$self->parsed_data->{'features'}}, $feat );
+	#$self->extract_extended_info($line); #no new info should be available here, since we are already parsing to create the sourc and thus no details could be attached to it
+  }
+  
+  print qq($line_num were parsed<br>\n) if($self->debug);
+  #Update metadata
+  $self->metadata->parsed_data->{'parsed'} = 1;
+  $self->metadata->parsed_data->{'features_parsed'} = $line_num;
+
+  return $self->metadata;
+}
+
+
+#Parse a feature line and get its info. Store it in the parsed_data strucure
+sub parseDataLine {
+   my ($self, $fields_ref, $line_num) = @_;
+
+   my @fields = @{$fields_ref};
+   
+   return $self->create_feature(\@fields, $line_num);
+}
+  
+
+######################## TESTING/PARSING COMMON FUNCTIONS ###########################33
+
+sub skip_lines {
+  my ($self, $parser) = @_;
+  if($self->metadata->parsing->{'skip_comments'}) {
+    my $nlines = $self->metadata->parsing->{'first_data_line'}-1;
+    print qq(Skipping $nlines lines<br>\n) if($self->debug);
+    for(my $i=0; $i<$nlines; $i++) {
+#	$parser->fetch;
+      my $line = $parser->fetch(); #fetch the line and do nothing, we just want to skip it
+      print qq(\tsikppedline: ).Dumper($line).qq(<br>\n) if($self->debug);
+    }
+  }
+}
+
+sub escape_quotes {
+  my $v=shift;
+  $v =~ s/[^\\]"/\\"/g;
+  return $v;
+}
+
+# taken from Bio::DB::GFF
+sub unescape {
+  my $v = shift;
+  $v =~ tr/+/ /;
+  $v =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
+  return $v;
+}
+
+
+sub DESTROY {
+  my $self = shift;
+  if($self->{'fh'}) {
+    close $self->{'fh'} or carp 'Error closing fh';
+  }
+  return;
+}
+
+
+
+
+
+
+
+
+1;
+__END__
+
+=head1 NAME
+
+Bio::Das::ProServer::SourceAdaptor::Transport::file
+
+=head1 VERSION
+
+$Revision: 567 $
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+A simple data transport for tab-separated files. Access is via the 'query' method.
+Expects a tab-separated file with no header line.
+
+Can optionally cache the file contents upon first usage. This may improve
+subsequence response speed at the expense of memory footprint.
+
+=head1 SUBROUTINES/METHODS
+
+=head2 query - Execute a basic query against a text file
+
+ Queries are of the form:
+
+ $filetransport->query(qq(field1 = 'value'));
+ $filetransport->query(qq(field1 lceq 'value'));
+ $filetransport->query(qq(field3 like '%value%'));
+ $filetransport->query(qq(field0 = 'value' && field1 = 'value'));
+ $filetransport->query(qq(field0 = 'value' and field1 = 'value'));
+ $filetransport->query(qq(field0 = 'value' and field1 = 'value' and field2 = 'value'));
+
+ "OR" compound queries not (yet) supported
+
+=head2 last_modified - machine time of last data change
+
+  $dbitransport->last_modified();
+
+=head2 DESTROY - object destructor - disconnect filehandle
+
+  Generally not directly invoked, but if you really want to - 
+
+  $filetransport->DESTROY();
+
+=head1 DIAGNOSTICS
+
+Run ProServer with the -debug flag.
+
+=head1 CONFIGURATION AND ENVIRONMENT
+
+Configured as part of each source's ProServer 2 INI file:
+
+  [myfile]
+  ... source configuration ...
+  transport = file
+  filename  = /data/features.tsv
+  unique    = 1 # optional
+  cache     = 1 # optional
+
+=head1 DEPENDENCIES
+
+=over
+
+=item L<File::stat>
+
+=item L<Bio::Das::ProServer::SourceAdaptor::Transport::generic>
+
+=back
+
+=head1 INCOMPATIBILITIES
+
+=head1 BUGS AND LIMITATIONS
+
+Only AND compound queries are supported.
+
+=head1 AUTHOR
+
+Roger Pettett <rmp@sanger.ac.uk> and Andy Jenkinson <aj@ebi.ac.uk>
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (c) 2008 The Sanger Institute and EMBL-EBI
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.  See DISCLAIMER.txt for
+disclaimers of warranty.
+
+=cut

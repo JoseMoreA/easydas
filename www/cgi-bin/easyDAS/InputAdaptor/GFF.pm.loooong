@@ -1,0 +1,1327 @@
+#########
+# Author:        Bernat Gel
+# Maintainer:    Bernat Gel
+# Created:       2009-09-21
+#
+# This is a specialized InputAdaptor for the GFF file format. 
+#
+
+###################################################################################
+#  Code adapted from GFF3::Validator by 
+#          Author: Payan Canaran (canaran@cshl.edu)
+#          Copyright (c) 2006-2007 Cold Spring Harbor Laboratory
+##################################################################################
+
+
+package easyDAS::InputAdaptor::GFF;
+
+use strict; 
+use warnings;
+
+use File::stat;
+use Carp;
+use Error qw(:try); #Add try/catch syntax
+
+use Data::Dumper;
+
+#use GFF3::Validator;
+
+use base qw(easyDAS::InputAdaptor);
+
+
+sub init {
+  my ($self, $config) = @_;
+
+  print "<br>Debug in GFF? ".$self->debug."<br>\n";
+
+  #Set the expected file extensions
+  my @file_exts = ('gff', 'gff2', 'gff3');
+  $self->{'file_extensions'} = \@file_exts;
+  $self->{'error_message'} = "";
+  $self->{'currently_in_fasta'} = 0; #at the beginning of the file we are NOT in a fasta section
+
+  $self->{'gff_version'} = '0'; #by default, we do NOT know wich version of GFF we are working with
+
+  print qq(metadata in gff init ).Dumper($self->metadata).qq(<br>\n);
+
+  print "(ed::IA::GFF-init): initializing FileGFF. filename=".$self->metadata->file_id."   original_filename=".$self->metadata->original_filename."\n"; 
+}
+
+
+##################GETTERS/SETTERS#####################################################
+
+sub gff_version {
+    my ($self, $value) = @_;
+    print "Found GFF version<br>\n";
+    print qq(<br><br>The metadata before: ).Dumper($self->metadata)."<br><br>\n";
+    if (defined $value) {
+      $self->{'gff_version'} = $value;
+      $self->get_parsing_metadata->{'gff_version'} = $value;
+    }
+    print qq(<br><br>The metadata after: ).Dumper($self->metadata)."<br><br>\n";
+    print qq((ed::IA::GFF): The file is known to be a GFF version $value\n) if($self->debug); 
+    return $self->{'gff_version'};
+}
+	
+sub currently_in_fasta {
+   my ($self, $value) = @_;
+   $self->{'currently_in_fasta'} .= $value if (defined $value);
+   return $self->{'currently_in_fasta'};
+}
+
+=head4 get_parsing_metadata
+
+ Function  : Returns a valid parsing metadata. Creates or adapts it if necessary
+ Arguments : 
+ Returns   : $metadata
+ 
+=cut
+sub get_parsing_metadata {
+  my ($self) = @_;
+  
+  my $meta = $self->metadata;
+  if($meta->parsing) {# IF the FileMetadata has a parsing section
+      if($meta->parsing->{'parsingtype'} && $meta->parsing->{'parsingtype'} eq 'GFF') { #IF the parsing section is of type GFF
+	  print "meta found. Returning <br>\n";
+	  return $meta->parsing;
+      } elsif($meta->parsing->{'parsingtype'} && $meta->parsing->{'parsingtype'} eq 'ColumnBasedText') { #If the parsing type is Column based text (the parent of GFF)
+	  #WARNING: WHAT IF the user forced the cuurent parsing type? We should not be here!!!
+	  $meta->parsing->{'parsingtype'} = "GFF";  #Change it's type to GFF
+	  return $meta->parsing;
+      } #else, continue
+  }
+  #if arrived here, we don't have a valid parsing section. Create one
+  #WARNING: WHAT IF the user forced the cuurent parsing type? We should not be here!!!
+  $meta->parsing($self->create_parsing_metadata);
+  return $meta->parsing;
+}
+
+=head4 create_parsing_metadata
+
+ Function  : creates a parsing metadata section for the GFF format
+ Arguments : 
+ Returns   : $metadata
+
+=cut
+sub create_parsing_metadata {
+  my ($self) = @_;
+  
+  my %parsing = (
+    parsingtype => "GFF",
+    parser => "easyDAS::InputAdaptor::FileGFF",
+    parser_parameters => {}
+  );
+  return \%parsing;
+}
+
+################## "REAL" METHODS ###################################################
+
+sub test {
+  my ($self) = @_;
+  print "<br>GFF TESTING CALLED<br>\n";
+  print "(ia::FileGFF-test): Start testing for GFF format\n" if($self->debug);
+
+  print qq((ia::FileGFF-test): Open File $self->{'filename'}\n) if($self->debug);
+  
+  #TODO: perform a first heuristic test. select 3 lines from the middle of the file ant test if they wheter are comments (start with #) or can be splitted in 8 parts by a tab.
+  #TODO: What if they are on the FASTA part of a GFF3 file????
+
+
+  my $fh = undef;
+  try {
+    $fh = $self->_fh();
+    seek $fh, 0, 0;  
+    return;
+  }
+  catch Error with {
+    my $ex = shift;   # Get hold of the exception object
+    print qq((ia::FileGFF-test): There was a poblem opening the file. Returning false.);
+  };  # <-- Remember the semicolon
+  
+  $self->reset_error_score();
+
+  my $fileExt = $self->checkFileExtension();
+  if($fileExt) {
+    print qq((ia::FileGFF-test): The file extension is one of the expecteds\n) if($self->{'debug'});
+  } else {
+    print qq((ia::FileGFF-test): The file extension is NOT one of the expecteds\n) if($self->{'debug'});
+    $self->add_error_score(40);
+  }
+
+  my $max_data_lines = 5; #the number of data lines used to detect if the file is a valid GFF
+  my $num_data_lines = 0;
+  my $all_valid = 1; #assume its true if it does'nt fail
+  my $line;
+  my $line_num =0;
+  
+  #walk the file line by line until max_data_lines lines of data have been found or we have entered the FASTA area
+  LINE: while($num_data_lines<$max_data_lines && !$self->currently_in_fasta && ($line = <$fh>) && ++$line_num) {
+	chomp($line); #remove any trailing space and newlines
+	print qq(Line $line_num: $line\n) if($self->debug);
+	my $valid_line = 0;
+	if($line =~ /^#/) {
+	  $valid_line = $self->parseHeaderLine($line); 
+	} 
+	elsif($line =~ /^>/) {
+	  #While not strictly valid, it has been used berfore, so take it into account as the start of the FASTA part of the file
+	  $self->currently_in_fasta(1);
+	  $valid_line =1;
+	}
+	else { #should be a standard data line 
+	  $valid_line = $self->testDataLine($line);
+	  $num_data_lines++;
+	}
+	$all_valid &= $valid_line;
+
+	#Special cases
+	if($line_num==1 && !($line=~/^##gff-version/)) {
+	  $self->add_error_score(40); #the first line in every GFF file is supposed to be ##gff-version
+	}
+  }
+
+  print qq(The final score for the file is: ).$self->error_score()."\n" if($self->debug);
+  print qq(And error messages are: ).$self->error_message()."\n" if($self->debug);
+
+  print qq(<br><br>The metadata after test is: ).Dumper($self->metadata)."<br><br>\n";
+
+  return $self->normalized_error_score();
+}
+
+sub parseHeaderLine {
+   my ($self, $line) = @_;
+  
+   # If this is a comment, do nothing
+   if ($line =~ /^#[^#]/ or $line eq "#") {
+        return 1; #because it's a valid comment in gff but not an "interesting one" (directive)
+   }
+   # If this is a directive, validate it
+   elsif ($line =~ /^##/) {
+
+        # Allowing multiple spaces
+        $line =~ s/ +/ /g;
+
+        # If a directive is invalid/malformed, it is not stored in the database
+        # following variable is used to track errors
+        my $valid_directive = 1;
+	chomp($line); #To remove the trailing new-line
+        if ($line =~ /^##gff-version/) {
+	    $self->add_error_score(-80); #if the file says it's a GFF... well, it should be
+            if ($line eq '##gff-version 3') {
+		  $self->gff_version(3);
+                }
+	    elsif ($line eq '##gff-version 2') {
+		  $self->gff_version(2);
+	    } else {
+		$self->error_message(qq(The gff version was not recognized: ($line)\n)); #store a note on that but do not fail.
+            }
+        }
+        elsif ($line =~ /^##sequence-region/) {
+            if ($line =~ /^##sequence-region \S+ \d+ \d+/) {
+                $self->add_error_score(-20); #valid directives increase the probability of being a gff
+            } else {
+                $self->error_message(qq(There was a malformed sequece-region directive: $line\n)); #store a note on that but do not fail.
+            }
+        }
+        elsif ($line =~ /^##feature-ontology/) {
+            if ($line =~ /^##feature-ontology (\S+)$/) {
+                $self->add_ontology($1);
+		$self->add_error_score(-20); #valid directives increase the probability of being a gff
+            } else {
+		$self->error_message(qq(There was a malformed feature-ontology directive: $line\n)); #store a note on that but do not fail.
+            }
+        }
+        elsif ($line =~ /^##attribute-ontology/) {
+	    $self->add_error_score(-20); #valid directives increase the probability of being a gf	
+            #never really used, so ignore           
+	}
+	elsif ($line =~ /^##source-ontology/) {
+	    $self->add_error_score(-20); #valid directives increase the probability of being a gff
+            #seems never used, so ignore
+        }
+        elsif ($line =~ /^###/) {
+	  #Do nothing since we do not check the feature content
+        }
+        elsif ($line =~ /^##FASTA/) {
+	    $self->add_error_score(-10); #valid directives increase the probability of being a gff, but FASTA is a common directive, so add less.
+            if ($line eq '##FASTA') {
+                $self->currently_in_fasta(1);
+                }
+            else {
+                $self->error_message(qq(There was an error in the FASTA directive: ($line)));
+            }
+        }
+	elsif ($line =~ /^##species/) {
+	    $self->add_error_score(-20); #valid directives increase the probability of being a gff
+            if ($line =~ /^##species (\S+)$/) {
+                $self->organism($1);
+            } else {
+		$self->error_message(qq(There was a malformed species directive: $line\n)); #store a note on that but do not fail.
+            }
+        }
+###############################easyDAS own non-standard directives ###################################
+	elsif ($line =~ /^##source_name/) {
+            if ($line =~ /^##source_name (\S+)$/) {
+                $self->source_name($1);
+            } else {
+		$self->error_message(qq(There was a malformed source_name easyDAS directive: $line\n)); #store a note on that but do not fail.
+            }
+        }
+	elsif ($line =~ /^##source_description/) {
+            if ($line =~ /^##source_description (\S+)$/) {
+                $self->source_description($1);
+            } else {
+		$self->error_message(qq(There was a malformed source_decription easyDAS directive: $line\n)); #store a note on that but do not fail.
+            }
+        }
+   	elsif ($line =~ /^##source_mantainer/) {
+            if ($line =~ /^##source_mantainer (\S+)$/) {
+                $self->source_mantainer($1);
+            } else {
+		$self->error_message(qq(There was a malformed source_mantainer easyDAS directive: $line\n)); #store a note on that but do not fail.
+            }
+        }
+##############################END of easyDAS own directives ############################################
+        else {
+            $self->error_message(qq(There was an unknown directive: $line\n)); #store a note on that but do not fail.
+        }
+
+        return 1;
+    }
+}
+
+#Parse a feature line and get its info. Return true iif the feature line is valid
+sub testDataLine {
+    #TODO: Keep track of the line numbers. So it would be possible to return useful information to the user
+    my ($self, $line, $feature_attributes) = @_;
+
+    $self->reset_line_error_score();
+
+    # Parse line
+    my @fields = split("\t", $line);
+    if (@fields != 9) {
+        $self->error_message(qq(The line does NOT have 9 tab separated fields: ($line)));
+	$self->add_line_error_score(100);
+        return 0;
+    }
+
+    #TODO: Save the actual data for testing purposes
+
+    # Empty fields must have a dot
+    foreach my $i (0..$#fields) {
+      if ((!defined $fields[$i]) or $fields[$i] eq "") {
+	 $self->error_message(qq(There's an empty field ($i) in this data line. Empty fields MUST have a dot on them: ($line)\n));
+	 $self->add_line_error_score(30); #While the standard says that empty fields MUST have a dot, thre are GFF files without them... add error, but do not return invalid
+      }
+    }
+
+    #################################
+    # The fields are processed here #
+    #################################
+
+    # Assign fields
+    my ($seqid, $source, $type, $start, $end, $score, $strand, $phase, $attributes) = @fields;
+
+    # Validate seqid
+    if(defined $seqid) {
+      if ($seqid =~ /[^a-zA-Z0-9\.\:\^\*\$\@\!\+\_\?\-\|\%]/) {
+	  $self->error_message(qq(There's an invalid character in the seqid (first) field in the line: ($line)));
+	  $self->add_line_error_score(10);
+      }
+      if ($seqid eq '.' or $seqid eq "") { #This is an error in GFF, but not serious for us, since the user can supply it via the GUI
+	  $self->error_message(qq(The seqid (first) field in the line is empty: ($line)));
+	  $self->add_line_error_score(5);
+      }
+    }
+
+    # Validate source
+    if(defined $source) {
+      if ($source =~ /[^a-zA-Z0-9\.\: \^\*\$\@\!\+\_\?\-\%]/) {
+	$self->error_message(qq(There's an invalid character in the source (second) field in line: ($line)\n));
+	$self->add_line_error_score(10);
+      }
+    }
+
+    # Validate type
+    if(defined $type) {
+      if ($type =~ /[^a-zA-Z0-9\.\: \^\*\$\@\!\+\_\?\-]/) {
+	  $self->error_message(qq(There's an invalid character in the type (third) field in the line: ($line)));
+	  $self->add_line_error_score(10);
+      }
+      if ($type eq '.' or $type eq "") {
+	  $self->error_message(qq(The type (third) field in the line is empty: ($line)));
+	  $self->add_line_error_score(5);
+      }
+    }
+
+    # Validate start and end
+    if(defined $start and defined $end) {
+	if ($start =~ /[^\d]/ or $end =~ /[^\d]/) {
+	    $self->error_message(qq(There's an invalid character in the start or end (4th or 5th) field in the line: ($line)));
+	    $self->add_line_error_score(50); #if start or end is not a number, it PROBABLY is not a GFF
+	} else {
+	    #we are sure they are numbers
+	    if ($start < 1 or $end < 1) {
+	      $self->error_message(qq(The number specified in the start or end (4th or 5th) field is less than 1 in the line: ($line)));
+	      $self->add_line_error_score(10);
+	    } 
+	    if ($end < $start) {
+	      $self->message(qq(The field start (4th) is greater than the end (5th) in line: ($line)));
+	    }
+	}
+	if(($start eq "" and $end ne "") or ($end eq "" and $start ne "")) {
+	    #Only non-positional features will lack start AND end. HAving only one of them is STRANGE.
+	    $self->add_line_error_score(40);
+	}
+    } 
+
+    # Validate score
+    if(defined $score) {
+      if ($score ne "."                              and
+	$score !~ /^[\+\-]{0,1}\d+\.\d+$/          and
+	$score !~ /^[\+\-]{0,1}\d+$/               and
+	$score !~ /^[\+\-]{0,1}\d+(e|E)[\+\-]\d+$/ and
+	$score !~ /^[\+\-]{0,1}\d+\.\d+(e|E)[\+\-]\d+$/            
+      ) {
+	  $self->error_message(qq(The score (6th) field was not a number in line: ($line)));
+	  $self->add_line_error_score(20);
+      }
+    }
+
+    # Validate strand
+    if(defined $strand) {
+      if ($strand !~ /^[\+\-\.]$/) {
+	$self->error_message(qq(The strand (7th) field is not [+/-/.] in line: ($line)));
+	$self->add_line_error_score(15);
+      }
+    }
+
+    # Validate phase
+    if(defined $phase) {	
+      if ($phase !~ /^[012\.]$/) {
+	$self->error_message(qq(The phase (8th) field was not [0/1/2/.] in line: ($line)));
+	$self->add_line_error_score(15);
+      }	
+    }
+
+    my %attr;
+    my $attr_valid = $self->parse_attributes($attributes, \%attr);
+    if($attr_valid) {
+	$self->add_line_error_score(-60); #having a valid attributes field increases the probability of being a GFF
+	#print qq(Attributes are valid and their values are:).Dumper(%attr);
+    } else {
+	$self->add_line_error_score(30); #having an INvalid attributes field DEcreases the probability of being a GFF
+	$self->error_message(qq(The attributes field (9th) is not valid in line: ($line)));
+	#print qq(Attributes are NOT valid and their values are:).Dumper(%attr);
+    }
+    
+    #Finally, add some "bonus points" if any of the optional fields has a ".", since this is prety GFF specific
+    if($source eq "." or $score eq "." or $strand eq "." or $phase eq "." ) {
+      $self->add_line_error_score(-20);
+    }
+
+    if($self->line_error_score>70) { #Return a fail only if we are pretty sure it's not a GFF line
+      return 0; 
+    }
+    return 1;
+}
+
+sub parse_attributes {
+    my($self, $attr_str, $attr) = @_;
+    my $attr_valid;
+    if ($attr_str eq '.') {
+	return 1;
+    } else {
+	if($self->{'gff_version'} == 2) {
+	  $attr_valid = $self->parse_gff2_attributes($attr_str,$attr);
+	} elsif($self->{'gff_version'} == 3) {
+	  $attr_valid = $self->parse_gff3_attributes($attr_str, $attr);
+	} else {
+	  #if the version is not defined, try first ith gff3 (faster and better defined) and if it fails, try with gff2.
+	  #TODO: if trying with one and the other, the error_messages may stack-up
+	  $attr_valid = $self->parse_gff3_attributes($attr_str, $attr);
+	  if(!$attr_valid) {
+	     $attr_valid = $self->parse_gff2_attributes($attr_str, $attr);
+	  }
+	}
+    }
+    return $attr_valid;
+}
+
+
+#THE CODE FOR THIS FUNCTION IS MAINLY BORROWED FROM THE BIOPERL PROJECT. Bio::Tools::GFF
+#Slightly modified to suit our needs.
+sub parse_gff2_attributes {
+   my ($self, $attr_str, $attr) = @_;
+
+  print qq(Parsing attributes with gff2 syntax\n) if($self->debug);
+
+
+   #  <Begin Inefficient Code from Mark Wilkinson> 
+   # this routine is necessay to allow the presence of semicolons in
+   # quoted text Semicolons are the delimiting character for new
+   # tag/value attributes.  it is more or less a "state" machine, with
+   # the "quoted" flag going up and down as we pass thorugh quotes to
+   # distinguish free-text semicolon and hash symbols from GFF control
+   # characters
+   
+   
+   my $flag = 0; # this could be changed to a bit and just be twiddled
+   my @parsed;
+
+   # run through each character one at a time and check it
+   # NOTE: changed to foreach loop which is more efficient in perl
+   # --jasons
+   for my $a ( split //, $attr_str ) { 
+       # flag up on entering quoted text, down on leaving it
+       if( $a eq '"') { $flag = ( $flag == 0 ) ? 1:0 }
+       elsif( $a eq ';' && $flag ) { $a = "INSERT_SEMICOLON_HERE"}
+       elsif( $a eq '#' && ! $flag ) { last } 
+       push @parsed, $a;
+   }
+   $attr_str = join "", @parsed; # rejoin into a single string
+
+   # <End Inefficient Code>   
+   # Please feel free to fix this and make it more "perlish"
+
+   my @key_vals = split /;/, $attr_str;   # attributes are semicolon-delimited
+
+   foreach my $pair ( @key_vals ) {
+       # replace semicolons that were removed from free-text above.
+       $pair =~ s/INSERT_SEMICOLON_HERE/;/g;        
+
+       # separate the key from the value
+       my ($blank, $key, $values) = split  /^\s*([\w\d]+)\s/, $pair; 
+
+       #print qq(key: $key\nvalues: $values\n);
+
+       if(!defined $key) {
+	  $self->error_message(qq(The attributes field (9th) is not syntactically correct in GFF2. Trying with GFF3.));
+	  #CAUTION: Is here where this should be treated?
+	  #if the attributes parsing fails, try to give it to the gff3 parser, since the attributes has evolved gradually.
+	  #mirbase hsa.gff is an example of file takingthis branch
+	  return $self->parse_gff3_attributes($attr_str, $attr); 
+       }
+
+       if( defined $values ) {
+	   my @values;
+	   # free text is quoted, so match each free-text block
+	   # and remove it from the $values string
+	   while ($values =~ s/"(.*?)"//){
+	       # and push it on to the list of values (tags may have
+	       # more than one value... and the value may be undef)	       
+	       push @values, $1;
+	   }
+
+	   # and what is left over should be space-separated
+	   # non-free-text values
+
+	   my @othervals = split /\s+/, $values;  
+	   foreach my $othervalue(@othervals){
+	       # get rid of any empty strings which might 
+	       # result from the split
+	       if (CORE::length($othervalue) > 0) {push @values, $othervalue}  
+	   }
+
+	   $attr->{$key} = \@values;
+       } else { #All attributes have to be in the "key value" format.
+	  $self->error_message(qq(There was a TAG ($key) without value in the attributes));
+	  return 0;
+       }
+   }
+   return 1;
+}
+
+
+#parses the attributes field using the GF3 syntax (TAG=VALUE1,VALUE2;TAG2=VALUE;)
+#THIS CODE IS MAINLY BORROWED FROM BIOPERL Bio::Tools::GFF.
+#and slightly modified
+sub parse_gff3_attributes {
+    my ($self,  $attr_str, $attr) = @_;
+
+    print qq(Parsing attributes with gff3 syntax\n) if($self->debug);
+
+    if($attr_str ne "." and rindex($attr_str, ";")!=length($attr_str)-1) {
+      $self->error_message(qq(The last character of the string is not a ';'));
+      $self->add_error_score(20); #it's bad but can be a typical user error too.
+      $attr_str .= ";"; #Add a semicolon and try to parse from that
+    }
+
+    my @groups = split(/\s*;\s*/, $attr_str);
+    
+    for my $group (@groups) {
+	my ($tag,$value) = split /=/,$group;
+	$tag             = unescape($tag);
+	if(!defined $value) {
+	  $self->error_message(qq(The attributes are not in the form TAG=VALUE. No value found.));
+	  $self->add_error_score(30); #since it's different between GFF2 and GFF3, we can not rule out GFF because of this.
+	  $attr->{$tag} = 1;
+	} else {
+	  my @values       = map {unescape($_)} split /,/,$value;
+	  #@values          = map {escape_quotes($_)} @values; #values SHOULD be unquoted.... but, for example, hsa.gff from mirbase has them quoted
+	  #for my $v ( @values ) {  $feat->add_tag_value($tag,$v); }
+	  $attr->{$tag} = \@values;
+	}
+    }
+ #TODO: TAKE INTO ACCOUNT THE PREDEFINED VALUES FOR TAG. IN THEORY ANY TAG BEGINNING WITH A CAPITAL LETTER
+  return 1; #they seem like valid gff3 attributes
+}
+
+sub escape_quotes {
+  my $v=shift;
+  $v =~ s/[^\\]"/\\"/g;
+  return $v;
+}
+
+# taken from Bio::DB::GFF
+sub unescape {
+  my $v = shift;
+  $v =~ tr/+/ /;
+  $v =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
+  return $v;
+}
+
+
+
+sub ALTERNATIVE_ATTR_PARSING {
+	my($self, $attributes) = @_;
+
+	my ($line_number, %feature_attributes, %valid_feature_attributes);
+
+	if ($attributes =~ /[;\s]+$/) {
+	    $self->error_message($line_number, 'E', "empty tag/value information", "$attributes");
+	    $attributes =~ s/[;\s]+$//;
+	}
+				
+	foreach my $attribute (split(";", "$attributes")) {
+	    if (!defined $attribute or $attribute eq "" or $attribute =~ /^\s+$/) {
+		$self->message($line_number, 'E', "empty attribute", "$attribute");
+		}
+		
+	    my ($tag, $values) = $attribute =~ /^([^=]+)=(.*)/;  # We call it values as it might
+								  # contain multiple values separated with comma
+
+	    # Check empty tag/value
+	    if (!defined $tag or !defined $values) {
+		$self->message($line_number, 'E', "attribute not in tag=value format", "$attribute");
+		}
+	    else {
+		my @values = split(',', "$values,placeholder"); pop @values; # Make sure last item is included
+		foreach my $value (@values) {
+		    if (!defined $value or $value eq "" or $value =~ /^\s+$/) {
+			$self->message($line_number, 'E', "empty tag value/malformed tag-value pair", "$attribute");
+			}
+		    }
+		}
+
+	    # Check if this tag appears more than once
+	    if (exists $feature_attributes{$tag}) {
+		$self->message($line_number, $self->config("same_multiple_tags"), "feature has multiple tags of the same type", "tag: $tag");
+		}
+
+	    # Check value
+	    if ($values =~ /=/) {
+		$self->message($line_number, 'E', "tag value contains an equals sign", "$tag=$values");
+		}
+
+	    # Check tag
+	    $self->message($line_number, 'E', "empty tag name", "tag: $tag") if (defined $tag && $tag eq "");
+	    $self->message($line_number, 'E', "empty tag name", "tag: $tag") if $tag =~ /^\s+$/;
+	    $self->message($line_number, 'E', "tag has preceding space", "tag: $tag") if $tag =~ /^\s+/;
+	    $self->message($line_number, 'E', "tag has leading space", "tag: $tag")   if $tag =~ /\s+$/;
+
+	    # Check if this is an first-uppercase tag (if so it's reserved and check contents)
+	    if ($tag =~ /^[A-Z]/) {
+
+		# Process multiple values
+		foreach my $value (split ",", $values) {
+
+		    my $valid_value = 1; # Variable to track validity of value
+
+		    # Check if non-empty value
+		    if (!(defined $values) or $value eq "" or $value =~ /^ +$/) {
+			$self->message($line_number, 'E', "empty tag value", "$tag: $value");
+			$valid_value = 0;
+			}
+
+		    # Validate Name
+		    if ($tag eq 'ID') {
+			# Don't do anything
+			}
+
+		    elsif ($tag eq 'Name') {
+			# Don't do anything
+			}
+
+		    elsif ($tag eq 'Alias') {
+			# Don't do anything
+			}
+
+		    elsif ($tag eq 'Parent') {
+			# Don't do anything
+			}
+
+		    elsif ($tag eq 'Target') {
+			if ($value !~ /^\S+\s+\d+\s+\d+$/ and
+			    $value !~ /^\S+\s+\d+\s+\d+\s+[\+\-]/) {
+			    $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+			    $valid_value = 0;
+			    }
+			}
+
+		    elsif ($tag eq 'Gap') {
+			my $malformed = 0;
+			foreach my $operation (split /\s+/, $value) {
+			    if ($operation !~ /^[MIDFRmidfr]\d+$/) {
+				$malformed = 1;
+				last;
+				}
+			    }
+
+			if ($malformed) {
+			    $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+			    $valid_value = 0;
+			    }
+			}
+
+		    elsif ($tag eq 'Derives_from') {
+			# Don't do anything
+			}
+
+		    elsif ($tag eq 'Note') {
+			# Don't do anything
+			}
+
+		    elsif ($tag eq 'Dbxref') {
+			if ($value !~ /^[^:]+:.+$/) {
+			    $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+			    $valid_value = 0;
+			    }
+			}
+
+		    elsif ($tag eq 'Ontology_term') {
+			if ($value !~ /^[^:]+:.+$/) {
+			    $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+			    $valid_value = 0;
+			    }
+			}
+
+		    elsif ($tag eq 'Indexed') {
+			if ($value !~ /^(0|1)$/) {
+			    $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+			    $valid_value = 0;
+			    }
+			}
+
+		    else {
+			$self->message($line_number, 'E', "unrecognized first-uppercase (reserved) tag", "tag: $tag");
+			$valid_value = 0;
+			}
+
+		    # Store value in attributes hash
+		    push(@{$feature_attributes{$tag}}, $value);
+
+		    # Store value in valid attributes hash if valid
+		    push(@{$valid_feature_attributes{$tag}}, $value) if $valid_value;
+
+		    # Processing of values separated by comma ends here
+		    }
+
+		# Processing of first-uppercase tags ends here
+		}
+
+	    # Attribute processing loop ends here
+	    }
+
+	# Attribute checking ends here
+	}
+
+
+
+sub DESTROY {
+  my $self = shift;
+  if($self->{'fh'}) {
+    close $self->{'fh'} or carp 'Error closing fh';
+  }
+  return;
+}
+
+
+
+
+=head4 _parse_gff_line
+
+ Function  : Validates a gff line
+ Arguments : $line, $line_number
+ Returns   : $line_type, \@parsed_data
+ Notes     : This is a private method
+
+=cut
+
+sub _parse_gff_line {
+	my ($self, $line, $line_number) = @_;
+
+    $line_number = $line_number || '0';
+
+    # At the end of validation, these variables will be returned
+    my $line_type;
+    my @parsed_data;
+    my %additional_information;
+
+    # Allowing spaces at the end of lines
+    $line =~ s/ +$//;
+
+    # IMPORTANT: There are 3 types of lines:
+    #
+    # 1) "other"     these are not used in any calculations, they are not recorded
+    # 2) "directive" these can have file-wide analysis effects, they are recorded for later use
+    #                if their format is incorrect, they are skipped, not loaded into the database and they do *not* affect later analysis
+    # 3) "feature"   main information lines, these are heavily checked, each part is processed separately
+    #                generally, if a part is malformed, it does not get loaded into the database
+    #                however, there are some parts that are loaded into the database even if they are malformed/invalid
+    #                e.g. a malformed seqid is loaded, a malformed start position is not loaded
+
+    #########################
+    # LINE TYPE 1 - "other" #
+    #########################
+
+    # If this is an empty line, just record it
+    if ($line eq "") {
+        $line_type = 'other';
+        @parsed_data = ('placeholder');
+        %additional_information = ();
+        }
+
+    # If we have previously encountered a ##FASTA directive, just record it
+    elsif ($self->currently_in_fasta) {
+        $line_type = 'other';
+        @parsed_data = ('placeholder');
+        %additional_information = ();
+        }
+
+    # If this is a comment, just record it
+    elsif ($line =~ /^#[^#]/ or $line eq "#") {
+        $line_type = 'other';
+        @parsed_data = ('placeholder');
+        %additional_information = ();
+        }
+
+    # If this is a line starting with '>', set $self->currently_in_fasta (for backward compatibility)
+    elsif ($line =~ /^>/) {
+        $self->currently_in_fasta(1);
+
+        $line_type = 'other';
+        @parsed_data = ('placeholder');
+        %additional_information = ();
+        }
+
+    #############################
+    # LINE TYPE 2 - "directive" #
+    #############################
+
+    # If this is a directive, validate it
+    elsif ($line =~ /^##/) {
+
+        # Allowing multiple spaces
+        $line =~ s/ +/ /g;
+
+        # If a directive is invalid/malformed, it is not stored in the database
+        # following variable is used to track errors
+        my $valid_directive = 1;
+
+        if ($line =~ /^##gff-version/) {
+            if ($line eq '##gff-version 3') {
+                #easyDAS
+		  $self->gff_version(3);
+                }
+	    elsif ($line eq '##gff-version 2') {
+		#easyDAS
+		  $self->gff_version(2);
+	    } else {
+                $self->message($line_number, 'E', "invalid directive", "directive: $line");
+                $valid_directive = 0;
+                }
+	    #easyDAS
+            #if ($line_number != 1) {
+            #    $self->message($line_number, 'E', "##gff-version directive is not the first line", "directive: $line, line_number: $line_number");
+            #    $valid_directive = 0;
+            #    }
+        }
+
+        elsif ($line =~ /^##sequence-region/) {
+            if ($line =~ /^##sequence-region \S+ \d+ \d+/) {
+                # Do nothing
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        elsif ($line =~ /^##feature-ontology/) {
+            if ($line =~ /^##feature-ontology (\S+)$/) {
+                $self->ontology_files("directive", $1);
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        elsif ($line =~ /^##attribute-ontology/) {
+            if ($line =~ /^##attribute-ontology \S+$/) {
+                $self->message($line_number, 'E', "directive reserved for future use", "directive: $line");
+                $valid_directive = 0;
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        elsif ($line =~ /^##source-ontology/) {
+            if ($line =~ /^##source-ontology \S+$/) {
+                $self->message($line_number, 'E', "directive reserved for future use", "directive: $line");
+                $valid_directive = 0;
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        elsif ($line =~ /^###/) {
+            if ($line eq '###') {
+                # Do nothing
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        elsif ($line =~ /^##FASTA/) {
+            if ($line eq '##FASTA') {
+                $self->currently_in_fasta(1);
+                $self->log("Now in FASTA sequence segment");
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        elsif ($line =~ /^##Index-subfeatures/) {
+            if ($line =~ /^##Index-subfeatures\s+(0|1)\s*$/) {
+                # Do nothing
+                }
+            else {
+                $self->message($line_number, 'E', "malformed directive", "directive: $line");
+                $valid_directive = 0;
+                }
+            }
+
+        else {
+            $self->message($line_number, 'W', "unknown directive", "directive: $line");
+            $valid_directive = 0;
+            }
+
+        # If there are no errors, schedule this directive for storage
+        $line_type = 'directive';
+        @parsed_data = $valid_directive ? ($line) : (undef);
+        %additional_information = ();
+
+        # End of processing of directives
+        }
+
+    #############################
+    # LINE TYPE 3 - "feature"   #
+    #############################
+
+    # If it doesn't match any of these, it will be treated as a feature line
+    else {
+        my %feature_errors; # variable to track errors
+                            # (each part of a feature is processed separately)
+
+        my %feature_attributes; # variable to track
+                                # attributes of a feature
+
+        my %valid_feature_attributes; # variable to track
+                                      # valid attributes of a feature
+
+        # Parse line
+        my @fields = split("\t", $line);
+        if (@fields != 9) {
+           $self->message($line_number, 'E', "incorrect number of fields", "fields: " . @fields);
+           }
+
+        # Empty fields must have a dot
+        foreach my $i (0..$#fields) {
+            if ((!defined $fields[$i]) or $fields[$i] eq "") {
+                $self->message($line_number, 'E', "empty field", "field: " . $i);
+                }
+            }
+
+        #################################
+        # The fields are processed here #
+        #################################
+
+        # Assign fields
+        my ($seqid, $source, $type, $start, $end, $score, $strand, $phase, $attributes) = @fields;
+
+        # Validate seqid
+        if ($seqid =~ /[^a-zA-Z0-9\.\:\^\*\$\@\!\+\_\?\-\|\%]/) {
+            $self->message($line_number, 'E', "illegal character in field", "seqid: $seqid");
+            }
+        if ($seqid eq '.') {
+            $self->message($line_number, 'E', "feature does not have a seqid specified", undef);
+            }
+
+        # Validate source
+        if ($source =~ /[^a-zA-Z0-9\.\: \^\*\$\@\!\+\_\?\-\%]/) {
+            $self->message($line_number, 'E', "illegal character in field", "source: $source");
+            }
+
+        # Validate type
+        if ($type =~ /[^a-zA-Z0-9\.\: \^\*\$\@\!\+\_\?\-]/) {
+            $self->message($line_number, 'E', "illegal character in field", "type: $type");
+            }
+        if ($type eq '.') {
+            $self->message($line_number, 'E', "feature does not have a type specified", undef);
+            }
+
+        # Validate start and end
+        if ($start =~ /[^\d]/ or $end =~ /[^\d]/) {
+            $self->message($line_number, 'E', "illegal character in field", "start: $start, end: $end");
+            }
+        if ($start < 1 or $end < 1) {
+            $self->message($line_number, 'E', "start and/or end is not in 1-based coordinate system", "start: $start, end: $end");
+            }
+        if ($end < $start) {
+            $self->message($line_number, 'E', "end is not greater than or equal to start", "start: $start, end: $end");
+            }
+
+        # Validate score
+        if ($score ne "."                              and
+            $score !~ /^[\+\-]{0,1}\d+\.\d+$/          and
+            $score !~ /^[\+\-]{0,1}\d+$/               and
+            $score !~ /^[\+\-]{0,1}\d+(e|E)[\+\-]\d+$/ and
+            $score !~ /^[\+\-]{0,1}\d+\.\d+(e|E)[\+\-]\d+$/            
+            ) {
+            $self->message($line_number, 'E', "illegal character in field", "score: $score");
+            }
+
+        # Validate strand
+        if ($strand !~ /^[\+\-\.]$/) {
+            $self->message($line_number, 'E', "illegal character in field", "strand: $strand");
+            }
+
+        # Validate phase
+        if ($phase !~ /^[012\.]$/) {
+            $self->message($line_number, 'E', "illegal character in field", "phase: $phase");
+            }
+
+        # Validate phase for CDS
+        if ($type eq 'CDS' and $phase !~ /^[012]$/) {
+            $self->message($line_number, 'E', "CDS does not have a phase", "phase: $phase");
+            }
+
+        ##########################################
+        # The attributes field is processed here #
+        ##########################################
+
+        # Validate attributes; Remember: [; = , tab] must be escaped. However, cleaning is not necessary for only comparison purposes
+        if ($attributes eq '.') {
+            # Do nothing
+            }
+
+        else {
+            if ($attributes =~ /[;\s]+$/) {
+                $self->message($line_number, 'E', "empty tag/value information", "$attributes");
+                $attributes =~ s/[;\s]+$//;
+                }
+                                   
+            foreach my $attribute (split(";", "$attributes")) {
+                if (!defined $attribute or $attribute eq "" or $attribute =~ /^\s+$/) {
+                    $self->message($line_number, 'E', "empty attribute", "$attribute");
+                    }
+                    
+                my ($tag, $values) = $attribute =~ /^([^=]+)=(.*)/;  # We call it values as it might
+                                                                     # contain multiple values separated with comma
+
+                # Check empty tag/value
+                if (!defined $tag or !defined $values) {
+                    $self->message($line_number, 'E', "attribute not in tag=value format", "$attribute");
+                    }
+                else {
+                    my @values = split(',', "$values,placeholder"); pop @values; # Make sure last item is included
+                    foreach my $value (@values) {
+                        if (!defined $value or $value eq "" or $value =~ /^\s+$/) {
+                            $self->message($line_number, 'E', "empty tag value/malformed tag-value pair", "$attribute");
+                            }
+                        }
+                    }
+
+                # Check if this tag appears more than once
+                if (exists $feature_attributes{$tag}) {
+                    $self->message($line_number, $self->config("same_multiple_tags"), "feature has multiple tags of the same type", "tag: $tag");
+                    }
+
+                # Check value
+                if ($values =~ /=/) {
+                    $self->message($line_number, 'E', "tag value contains an equals sign", "$tag=$values");
+                    }
+
+                # Check tag
+                $self->message($line_number, 'E', "empty tag name", "tag: $tag") if (defined $tag && $tag eq "");
+                $self->message($line_number, 'E', "empty tag name", "tag: $tag") if $tag =~ /^\s+$/;
+                $self->message($line_number, 'E', "tag has preceding space", "tag: $tag") if $tag =~ /^\s+/;
+                $self->message($line_number, 'E', "tag has leading space", "tag: $tag")   if $tag =~ /\s+$/;
+
+                # Check if this is an first-uppercase tag (if so it's reserved and check contents)
+                if ($tag =~ /^[A-Z]/) {
+
+                    # Process multiple values
+                    foreach my $value (split ",", $values) {
+
+                        my $valid_value = 1; # Variable to track validity of value
+
+                        # Check if non-empty value
+                        if (!(defined $values) or $value eq "" or $value =~ /^ +$/) {
+                            $self->message($line_number, 'E', "empty tag value", "$tag: $value");
+                            $valid_value = 0;
+                            }
+
+                        # Validate Name
+                        if ($tag eq 'ID') {
+                            # Don't do anything
+                            }
+
+                        elsif ($tag eq 'Name') {
+                            # Don't do anything
+                            }
+
+                        elsif ($tag eq 'Alias') {
+                            # Don't do anything
+                            }
+
+                        elsif ($tag eq 'Parent') {
+                            # Don't do anything
+                            }
+
+                        elsif ($tag eq 'Target') {
+                            if ($value !~ /^\S+\s+\d+\s+\d+$/ and
+                                $value !~ /^\S+\s+\d+\s+\d+\s+[\+\-]/) {
+                                $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+                                $valid_value = 0;
+                                }
+                            }
+
+                        elsif ($tag eq 'Gap') {
+                            my $malformed = 0;
+                            foreach my $operation (split /\s+/, $value) {
+                                if ($operation !~ /^[MIDFRmidfr]\d+$/) {
+                                    $malformed = 1;
+                                    last;
+                                    }
+                                }
+
+                            if ($malformed) {
+                                $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+                                $valid_value = 0;
+                                }
+                            }
+
+                        elsif ($tag eq 'Derives_from') {
+                            # Don't do anything
+                            }
+
+                        elsif ($tag eq 'Note') {
+                            # Don't do anything
+                            }
+
+                        elsif ($tag eq 'Dbxref') {
+                            if ($value !~ /^[^:]+:.+$/) {
+                                $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+                                $valid_value = 0;
+                                }
+                            }
+
+                        elsif ($tag eq 'Ontology_term') {
+                            if ($value !~ /^[^:]+:.+$/) {
+                                $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+                                $valid_value = 0;
+                                }
+                            }
+
+                        elsif ($tag eq 'Indexed') {
+                            if ($value !~ /^(0|1)$/) {
+                                $self->message($line_number, 'E', "invalid reserved attribute format", "$tag: $value");
+                                $valid_value = 0;
+                                }
+                            }
+
+                        else {
+                            $self->message($line_number, 'E', "unrecognized first-uppercase (reserved) tag", "tag: $tag");
+                            $valid_value = 0;
+                            }
+
+                        # Store value in attributes hash
+                        push(@{$feature_attributes{$tag}}, $value);
+
+                        # Store value in valid attributes hash if valid
+                        push(@{$valid_feature_attributes{$tag}}, $value) if $valid_value;
+
+                        # Processing of values separated by comma ends here
+                        }
+
+                    # Processing of first-uppercase tags ends here
+                    }
+
+                # Attribute processing loop ends here
+                }
+
+            # Attribute checking ends here
+            }
+
+        # Check if we have only one ID (this is an implied requirement)
+        # If there is only one, record it
+        my $id;
+        if (exists $feature_attributes{ID}) {
+            if (@{$feature_attributes{ID}} > 1) {
+                $self->message($line_number, 'E', "multiple id attribute values", "ID");
+                }
+            else {
+                $id = $feature_attributes{ID}->[0];
+                }
+            }
+
+        # Check if we have only one Name (this is an implied requirement)
+        # (Not used, no need to record)
+        if (exists $feature_attributes{Name}) {
+            if (@{$feature_attributes{Name}} > 1) {
+                $self->message($line_number, 'E', "multiple attribute values", "Name");
+                }
+            }
+
+        # Construct signature to distinguish multi-feature features
+        # my $cleaned_attributes = $attributes;
+        # $cleaned_attributes =~ s/Target[^;]+//;
+        my $copy_of_attributes = $attributes;
+        my $target_id;
+        if ($copy_of_attributes =~ s/Target=(\S+)[^;]*//) {
+            $target_id = $1;
+            }
+
+        my $multi_feature_digest = Digest::SHA1::sha1_hex(join(":", $seqid, $source, $type, $strand, $target_id, $copy_of_attributes));
+
+        # Prepare line type and parsed_data
+        $line_type = 'feature';
+        @parsed_data = ($source, $type, $id, $multi_feature_digest);
+        %additional_information = ( # Capture parent and derives_from information
+                                    Parent       => $valid_feature_attributes{Parent} ? $valid_feature_attributes{Parent} : [],
+                                    Derives_from => $valid_feature_attributes{Derives_from} ? $valid_feature_attributes{Derives_from} : [],
+                                    );
+
+        # End of processing features
+        }
+
+   # This information is returned to the load analysis db sub
+   return ($line_type, \@parsed_data, \%additional_information);
+}
+
+
+
+###############################################################################################
+#   END Of GFF3::Validator code
+###############################################################################################
+
+1;
+__END__
+
+=head1 NAME
+
+Bio::Das::ProServer::SourceAdaptor::Transport::file
+
+=head1 VERSION
+
+$Revision: 567 $
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+A simple data transport for tab-separated files. Access is via the 'query' method.
+Expects a tab-separated file with no header line.
+
+Can optionally cache the file contents upon first usage. This may improve
+subsequence response speed at the expense of memory footprint.
+
+=head1 SUBROUTINES/METHODS
+
+=head2 query - Execute a basic query against a text file
+
+ Queries are of the form:
+
+ $filetransport->query(qq(field1 = 'value'));
+ $filetransport->query(qq(field1 lceq 'value'));
+ $filetransport->query(qq(field3 like '%value%'));
+ $filetransport->query(qq(field0 = 'value' && field1 = 'value'));
+ $filetransport->query(qq(field0 = 'value' and field1 = 'value'));
+ $filetransport->query(qq(field0 = 'value' and field1 = 'value' and field2 = 'value'));
+
+ "OR" compound queries not (yet) supported
+
+=head2 last_modified - machine time of last data change
+
+  $dbitransport->last_modified();
+
+=head2 DESTROY - object destructor - disconnect filehandle
+
+  Generally not directly invoked, but if you really want to - 
+
+  $filetransport->DESTROY();
+
+=head1 DIAGNOSTICS
+
+Run ProServer with the -debug flag.
+
+=head1 CONFIGURATION AND ENVIRONMENT
+
+Configured as part of each source's ProServer 2 INI file:
+
+  [myfile]
+  ... source configuration ...
+  transport = file
+  filename  = /data/features.tsv
+  unique    = 1 # optional
+  cache     = 1 # optional
+
+=head1 DEPENDENCIES
+
+=over
+
+=item L<File::stat>
+
+=item L<Bio::Das::ProServer::SourceAdaptor::Transport::generic>
+
+=back
+
+=head1 INCOMPATIBILITIES
+
+=head1 BUGS AND LIMITATIONS
+
+Only AND compound queries are supported.
+
+=head1 AUTHOR
+
+Roger Pettett <rmp@sanger.ac.uk> and Andy Jenkinson <aj@ebi.ac.uk>
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (c) 2008 The Sanger Institute and EMBL-EBI
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.  See DISCLAIMER.txt for
+disclaimers of warranty.
+
+=cut

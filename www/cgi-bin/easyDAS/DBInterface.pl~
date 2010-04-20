@@ -1,0 +1,95 @@
+#########
+# Author:        bernat gel
+# Created:       2003-05-20
+#
+# DBHAndler
+#
+# This file contains the class easyDAS::DBInterface
+#
+
+package easyDAS::DBInterface;
+
+use strict;
+use warnings;
+
+use Carp;
+use Data::Dumper;
+use DBI;
+
+#DB CONFIG
+my $db='easyDAS';
+my $host = 'localhost';
+my $user='root';
+my $password = 'root';
+
+
+sub new {
+  my ($class, $debug) = @_;
+
+
+
+  $dbh = DBI->connect("DBI:mysql:database=$db;host=$host", $user, $password, {RaiseError => 1, AutoCommit=1});
+    
+  my $self = {
+	      'dbh'	 => $dbh,
+              'debug'    => $debug || 0,
+             };
+
+  bless $self, $class;
+  return $self;
+}
+
+sub debug {
+  my ($self) = @_;
+  return $self->{'debug'};
+}
+
+##########################################################
+#                                                        #
+#             Interface Methods                          #
+#                                                        #
+##########################################################
+
+sub create_source {
+  my ($self, $source_name) = @_;
+  $self->source($source_name) if(defined $source_name);
+  print qq(Called DB newSource: ).$self->source.qq(<br>\n) if($self->debug);
+}
+
+#given an arry of features, this method stores
+sub addFeatures {
+  
+  print qq(Called DB addFeatures<br>\n) if($self->debug);
+}
+
+#get/set the source name
+sub source {
+  my ($self, $value) = @_;
+  $self->{'source') = $value if(defined $value);
+  return $self->{'source'};
+}
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1;

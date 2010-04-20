@@ -1,0 +1,632 @@
+##############################################################################
+#  ProServer DAS Server v608 (c) GRL 2007                                    #
+#  http://www.sanger.ac.uk/proserver/                                        #
+#                                                                            #
+#  Please cite:                                                              #
+#   ProServer: A simple, extensible Perl DAS server.                         #
+#   Finn RD, Stalker JW, Jackson DK, Kulesha E, Clements J, Pettett R.       #
+#   Bioinformatics 2007; doi: 10.1093/bioinformatics/btl650; PMID: 17237073  #
+##############################################################################
+
+build_das_response for $VAR1 = bless( {
+                 '_protocol' => 'HTTP/1.1',
+                 '_content' => '',
+                 '_uri' => bless( do{\(my $o = '/blahblahabla/user23/das/sources')}, 'URI::_generic' ),
+                 '_headers' => bless( {
+                                        'user-agent' => 'Mozilla/5.0 (X11; U; Linux i686; en-GB; rv:1.9.0.14) Gecko/2009090216 Ubuntu/9.04 (jaunty) Firefox/3.0.14',
+                                        'connection' => 'keep-alive',
+                                        'cache-control' => 'max-age=0',
+                                        'keep-alive' => '300',
+                                        'accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                        'accept-language' => 'en-gb,en;q=0.5',
+                                        'accept-encoding' => 'gzip,deflate',
+                                        'host' => 'localhost:9000',
+                                        'accept-charset' => 'ISO-8859-1,utf-8;q=0.7,*;q=0.7'
+                                      }, 'HTTP::Headers' ),
+                 '_method' => 'GET'
+               }, 'HTTP::Request' );
+
+Username user23 assigned to config and request
+assigning homepage as call
+Calling knows for dsn sources
+testig hydra
+getting the hydra hydra_easyDAS
+username is: user23
+prior to returning hydra is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             }
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+done. hydra is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             }
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Calling sources
+hydra self is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             }
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Asking for sources and username is: anonymous
+Results: $VAR1 = [
+          [
+            'anonymoussource'
+          ]
+        ];
+
+Stored: $VAR1 = [
+          'anonymoussource'
+        ];
+
+going to call 'response_sources'
+reponse_sources call: homepage
+call to adaptors
+prior to returning hydra is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             },
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => $VAR1->{'config'},
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+hydra self is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             },
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => $VAR1->{'config'},
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Asking for sources and username is: anonymous
+CAll to _hydra_adaptor with hydraname: hydra_easyDAS and dsn: anonymoussource
+prior to returning hydra is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             },
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => $VAR1->{'config'},
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+hydra self is: $VAR1 = bless( {
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => {
+                               '_hydra' => $VAR1,
+                               'maintainer' => 'bernat@ebi.ac.uk',
+                               'adaptor' => 'easydas',
+                               'transport' => 'dbi',
+                               'easydas_username' => 'user23',
+                               'strict_boundaries' => undef,
+                               'username' => 'root',
+                               'host' => 'localhost',
+                               'dbname' => 'easydas',
+                               'state' => 'on',
+                               'basename' => 'hydra',
+                               'password' => 'root',
+                               'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                               'debug' => '1',
+                               'hydra' => 'easydas'
+                             },
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => $VAR1->{'config'},
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Asking for sources and username is: anonymous
+Building Adaptor of type Bio::Das::ProServer::SourceAdaptor::easydas
+Init in easydas input adaptor with dsn: anonymoussource  and username: user23
+input adaptor for source: $VAR1 = undef;
+got adaptor
+returning adaptors: $VAR1 = bless( {
+                 'protocol' => 'http',
+                 '_data' => {},
+                 'hostname' => 'localhost',
+                 'baseuri' => '',
+                 'port' => '9000',
+                 '_transport' => {
+                                   '' => bless( {
+                                                  'dsn' => 'anonymoussource',
+                                                  'dbh' => bless( {}, 'DBI::db' ),
+                                                  'debug' => 1,
+                                                  'config' => {
+                                                                '_hydra' => bless( {
+                                                                                     'dsn' => '',
+                                                                                     'debug' => undef,
+                                                                                     'config' => $VAR1->{'_transport'}{''}{'config'},
+                                                                                     '_sources' => {
+                                                                                                     'anonymous' => [
+                                                                                                                      'anonymoussource'
+                                                                                                                    ]
+                                                                                                   },
+                                                                                     '_sourcecache_timestamp' => 1256145088,
+                                                                                     '_transport' => bless( {
+                                                                                                              'dsn' => 'unknown',
+                                                                                                              'dbh' => $VAR1->{'_transport'}{''}{'dbh'},
+                                                                                                              'debug' => undef,
+                                                                                                              'config' => $VAR1->{'_transport'}{''}{'config'},
+                                                                                                              'init_time' => 1256145088
+                                                                                                            }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+                                                                                   }, 'Bio::Das::ProServer::SourceHydra::easydas' ),
+                                                                'maintainer' => 'bernat@ebi.ac.uk',
+                                                                'adaptor' => 'easydas',
+                                                                'transport' => 'dbi',
+                                                                'strict_boundaries' => undef,
+                                                                'dbname' => 'easydas',
+                                                                'state' => 'on',
+                                                                'hydraname' => 'hydra_easyDAS',
+                                                                'password' => 'root',
+                                                                'debug' => '1',
+                                                                'easydas_username' => 'user23',
+                                                                'host' => 'localhost',
+                                                                'username' => 'root',
+                                                                'basename' => 'hydra',
+                                                                'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                                'hydra' => 'easydas'
+                                                              },
+                                                  'init_time' => 1256145088
+                                                }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+                                 },
+                 'username' => 'user23',
+                 '_features' => {},
+                 'dsn' => 'anonymoussource',
+                 'debug' => 1,
+                 'config' => $VAR1->{'_transport'}{''}{'config'},
+                 '_sequence' => {}
+               }, 'Bio::Das::ProServer::SourceAdaptor::easydas' );
+
+adaptors in response_source: $VAR1 = bless( {
+                 'protocol' => 'http',
+                 '_data' => {},
+                 'hostname' => 'localhost',
+                 'baseuri' => '',
+                 'port' => '9000',
+                 '_transport' => {
+                                   '' => bless( {
+                                                  'dsn' => 'anonymoussource',
+                                                  'dbh' => bless( {}, 'DBI::db' ),
+                                                  'debug' => 1,
+                                                  'config' => {
+                                                                '_hydra' => bless( {
+                                                                                     'dsn' => '',
+                                                                                     'debug' => undef,
+                                                                                     'config' => $VAR1->{'_transport'}{''}{'config'},
+                                                                                     '_sources' => {
+                                                                                                     'anonymous' => [
+                                                                                                                      'anonymoussource'
+                                                                                                                    ]
+                                                                                                   },
+                                                                                     '_sourcecache_timestamp' => 1256145088,
+                                                                                     '_transport' => bless( {
+                                                                                                              'dsn' => 'unknown',
+                                                                                                              'dbh' => $VAR1->{'_transport'}{''}{'dbh'},
+                                                                                                              'debug' => undef,
+                                                                                                              'config' => $VAR1->{'_transport'}{''}{'config'},
+                                                                                                              'init_time' => 1256145088
+                                                                                                            }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+                                                                                   }, 'Bio::Das::ProServer::SourceHydra::easydas' ),
+                                                                'maintainer' => 'bernat@ebi.ac.uk',
+                                                                'adaptor' => 'easydas',
+                                                                'transport' => 'dbi',
+                                                                'strict_boundaries' => undef,
+                                                                'dbname' => 'easydas',
+                                                                'state' => 'on',
+                                                                'hydraname' => 'hydra_easyDAS',
+                                                                'password' => 'root',
+                                                                'debug' => '1',
+                                                                'easydas_username' => 'user23',
+                                                                'host' => 'localhost',
+                                                                'username' => 'root',
+                                                                'basename' => 'hydra',
+                                                                'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                                'hydra' => 'easydas'
+                                                              },
+                                                  'init_time' => 1256145088
+                                                }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' )
+                                 },
+                 'username' => 'user23',
+                 '_features' => {},
+                 'dsn' => 'anonymoussource',
+                 'debug' => 1,
+                 'config' => $VAR1->{'_transport'}{''}{'config'},
+                 '_sequence' => {}
+               }, 'Bio::Das::ProServer::SourceAdaptor::easydas' );
+
+Calling knows for dsn sources
+testig hydra
+getting the hydra hydra_easyDAS
+prior to returning hydra is: $VAR1 = bless( {
+                 '_lastmodified_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => {
+                                                        '_hydra' => $VAR1,
+                                                        'maintainer' => 'bernat@ebi.ac.uk',
+                                                        'adaptor' => 'easydas',
+                                                        'transport' => 'dbi',
+                                                        'strict_boundaries' => undef,
+                                                        'dbname' => 'easydas',
+                                                        'state' => 'on',
+                                                        'hydraname' => 'hydra_easyDAS',
+                                                        'password' => 'root',
+                                                        'debug' => '1',
+                                                        'easydas_username' => 'user23',
+                                                        'host' => 'localhost',
+                                                        'username' => 'root',
+                                                        'basename' => 'hydra',
+                                                        'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                        'hydra' => 'easydas'
+                                                      },
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' ),
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => $VAR1->{'_transport'}{'config'},
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_lastmodified' => '1256137720'
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+done. hydra is: $VAR1 = bless( {
+                 '_lastmodified_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => {
+                                                        '_hydra' => $VAR1,
+                                                        'maintainer' => 'bernat@ebi.ac.uk',
+                                                        'adaptor' => 'easydas',
+                                                        'transport' => 'dbi',
+                                                        'strict_boundaries' => undef,
+                                                        'dbname' => 'easydas',
+                                                        'state' => 'on',
+                                                        'hydraname' => 'hydra_easyDAS',
+                                                        'password' => 'root',
+                                                        'debug' => '1',
+                                                        'easydas_username' => 'user23',
+                                                        'host' => 'localhost',
+                                                        'username' => 'root',
+                                                        'basename' => 'hydra',
+                                                        'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                        'hydra' => 'easydas'
+                                                      },
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' ),
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => $VAR1->{'_transport'}{'config'},
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_lastmodified' => '1256137720'
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Calling sources
+hydra self is: $VAR1 = bless( {
+                 '_lastmodified_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => {
+                                                        '_hydra' => $VAR1,
+                                                        'maintainer' => 'bernat@ebi.ac.uk',
+                                                        'adaptor' => 'easydas',
+                                                        'transport' => 'dbi',
+                                                        'strict_boundaries' => undef,
+                                                        'dbname' => 'easydas',
+                                                        'state' => 'on',
+                                                        'hydraname' => 'hydra_easyDAS',
+                                                        'password' => 'root',
+                                                        'debug' => '1',
+                                                        'easydas_username' => 'user23',
+                                                        'host' => 'localhost',
+                                                        'username' => 'root',
+                                                        'basename' => 'hydra',
+                                                        'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                        'hydra' => 'easydas'
+                                                      },
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' ),
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => $VAR1->{'_transport'}{'config'},
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_lastmodified' => '1256137720'
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Asking for sources and username is: anonymous
+127.0.0.1 2009-10-21T18:11:28 /blahblahabla/user23/das/sources 200 200
+build_das_response for $VAR1 = bless( {
+                 '_protocol' => 'HTTP/1.1',
+                 '_content' => '',
+                 '_uri' => bless( do{\(my $o = '/blahblahabla/user23/das/sources.xsl')}, 'URI::_generic' ),
+                 '_headers' => bless( {
+                                        'user-agent' => 'Mozilla/5.0 (X11; U; Linux i686; en-GB; rv:1.9.0.14) Gecko/2009090216 Ubuntu/9.04 (jaunty) Firefox/3.0.14',
+                                        'connection' => 'keep-alive',
+                                        'cache-control' => 'max-age=0',
+                                        'keep-alive' => '300',
+                                        'accept' => 'text/xml,application/xml,application/xhtml+xml,*/*;q=0.1',
+                                        'accept-language' => 'en-gb,en;q=0.5',
+                                        'accept-encoding' => 'gzip,deflate',
+                                        'host' => 'localhost:9000',
+                                        'accept-charset' => 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
+                                        'referer' => 'http://localhost:9000/blahblahabla/user23/das/sources'
+                                      }, 'HTTP::Headers' ),
+                 '_method' => 'GET'
+               }, 'HTTP::Request' );
+
+Username user23 assigned to config and request
+assigning homepage as call
+Asking for adaptor for dsn: 
+Calling knows for dsn sources.xsl
+testig hydra
+getting the hydra hydra_easyDAS
+prior to returning hydra is: $VAR1 = bless( {
+                 '_lastmodified_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => {
+                                                        '_hydra' => $VAR1,
+                                                        'maintainer' => 'bernat@ebi.ac.uk',
+                                                        'adaptor' => 'easydas',
+                                                        'transport' => 'dbi',
+                                                        'strict_boundaries' => undef,
+                                                        'dbname' => 'easydas',
+                                                        'state' => 'on',
+                                                        'hydraname' => 'hydra_easyDAS',
+                                                        'password' => 'root',
+                                                        'debug' => '1',
+                                                        'easydas_username' => 'user23',
+                                                        'host' => 'localhost',
+                                                        'username' => 'root',
+                                                        'basename' => 'hydra',
+                                                        'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                        'hydra' => 'easydas'
+                                                      },
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' ),
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => $VAR1->{'_transport'}{'config'},
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_lastmodified' => '1256137720'
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+done. hydra is: $VAR1 = bless( {
+                 '_lastmodified_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => {
+                                                        '_hydra' => $VAR1,
+                                                        'maintainer' => 'bernat@ebi.ac.uk',
+                                                        'adaptor' => 'easydas',
+                                                        'transport' => 'dbi',
+                                                        'strict_boundaries' => undef,
+                                                        'dbname' => 'easydas',
+                                                        'state' => 'on',
+                                                        'hydraname' => 'hydra_easyDAS',
+                                                        'password' => 'root',
+                                                        'debug' => '1',
+                                                        'easydas_username' => 'user23',
+                                                        'host' => 'localhost',
+                                                        'username' => 'root',
+                                                        'basename' => 'hydra',
+                                                        'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                        'hydra' => 'easydas'
+                                                      },
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' ),
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => $VAR1->{'_transport'}{'config'},
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_lastmodified' => '1256137720'
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Calling sources
+hydra self is: $VAR1 = bless( {
+                 '_lastmodified_timestamp' => 1256145088,
+                 '_transport' => bless( {
+                                          'dsn' => 'unknown',
+                                          'dbh' => bless( {}, 'DBI::db' ),
+                                          'debug' => undef,
+                                          'config' => {
+                                                        '_hydra' => $VAR1,
+                                                        'maintainer' => 'bernat@ebi.ac.uk',
+                                                        'adaptor' => 'easydas',
+                                                        'transport' => 'dbi',
+                                                        'strict_boundaries' => undef,
+                                                        'dbname' => 'easydas',
+                                                        'state' => 'on',
+                                                        'hydraname' => 'hydra_easyDAS',
+                                                        'password' => 'root',
+                                                        'debug' => '1',
+                                                        'easydas_username' => 'user23',
+                                                        'host' => 'localhost',
+                                                        'username' => 'root',
+                                                        'basename' => 'hydra',
+                                                        'styleshome' => '/home/bernat/EBI/easyDAS/dasserver/stylesheets',
+                                                        'hydra' => 'easydas'
+                                                      },
+                                          'init_time' => 1256145088
+                                        }, 'Bio::Das::ProServer::SourceAdaptor::Transport::dbi' ),
+                 'dsn' => '',
+                 'debug' => undef,
+                 'config' => $VAR1->{'_transport'}{'config'},
+                 '_sourcecache_timestamp' => 1256145088,
+                 '_sources' => {
+                                 'anonymous' => [
+                                                  'anonymoussource'
+                                                ]
+                               },
+                 '_lastmodified' => '1256137720'
+               }, 'Bio::Das::ProServer::SourceHydra::easydas' );
+
+Asking for sources and username is: anonymous
+127.0.0.1 2009-10-21T18:11:28 /blahblahabla/user23/das/sources.xsl 200 200

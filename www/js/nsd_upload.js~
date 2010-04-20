@@ -1,0 +1,187 @@
+/**Definition of the Step "Upload" from the new source dialog*/
+
+
+(function() {
+	//Private Attributes
+	var panel;
+	var label = "Upload";
+	var id = 'upload';
+	
+	var dialog;
+	
+	var file_upload;
+
+	//DOM REFERENCES
+	var table;
+	var bowser_button;
+	var selected_file;
+	var format_selector;
+	var upload_button;
+	var loading_label;
+	var uploaded_file;
+	
+	//Private Methods
+		/* //HTML
+		var tableFormHTML = function(){
+			return '<table>\
+						<tr>\
+							<td><label>Select a data file: </label></td>\
+							<td><button id="browse_file_button" name="datafile" class="cursor_hand" >Browse</button>\
+							<div class="file_name selected_file"></div>\
+							</td>\
+						</tr>\
+						<tr>\
+							<td><label>File Format: </label></td>\
+							<td><select name="filetype">\
+									<option value="automatic" selected="true">Automatically Detect</option>\
+									<option	value="gff">General Feature Format (GFF)</option>\
+									<option value="csv">Comma Separated Value (CSV)</option>\
+							</select></td>\
+						</tr>\
+						<tr>\
+							<td>&nbsp;</td>\
+							<td><button class="upload_file_button" disabled="disabled" >Upload</button> <span class="loading_file_label"></span></td>\
+						</tr>\
+						<tr>\
+							<td>Current file:</td>\
+							<td><span class="file_name current_file" >None</span></td>\
+					</table>\
+					';
+		};*/
+		//END HTML
+	var createPanel = function() {
+		panel = $('<div class="body"/>');
+
+		// OLD table = $(tableFormHTML()).appendTo(panel);
+
+		table = $('<table />');
+		var browse_row = $('<tr />').appendTo(table);
+		browse_row.append('<td><label>Select a data file: </label></td>');
+		browse_button = $('<button id="browse_file_button" name="datafile" class="cursor_hand" >Browse</button>');
+		selected_file = $('<div class="file_name selected_file" />');
+		$('<td />').append(browse_button)
+			   .append(selected_file)
+                           .appendTo(browse_row);
+						
+		var format_row = $('<tr />').appendTo(table);
+		format_selector = $('<select name="filetype">\
+					<option value="automatic" selected="true">Automatically Detect</option>\
+					<option	value="GFF">General Feature Format (GFF)</option>\
+					<option value="CSV">Comma Separated Value (CSV)</option>\
+				     </select>');
+		format_row.append('<td><label>File Format: </label></td>');
+		$('<td />').append(format_selector)
+                           .appendTo(format_row);
+
+		
+		var upload_row = $('<tr />').appendTo(table);
+		upload_button = $('<button class="upload_file_button" disabled="disabled" >Upload</button>'); 	
+		loading_label = $('<span class="loading_file_label" />');
+		$('<td />').appendTo(upload_row);
+		$('<td />').append(upload_button)
+			   .append(loading_label)
+			   .appendTo(upload_row);
+
+		var current_row = $('<tr />').appendTo(table);
+		uploaded_file = $('<span class="file_name current_file" >None</span>');
+		$('<td>Current file:</td>').appendTo(current_row);
+		$('<td />').append(uploaded_file)
+                           .appendTo(current_row);
+
+
+		panel.append(table);
+				
+	};
+	
+	
+	
+	//Define the AJAX file uploader
+	var setAjaxFileUpload = function(){ //arg: table
+		file_upload = new AjaxUpload('#browse_file_button', {
+			action: 'cgi-bin/easyDAS.pl',
+			name: browse_button.attr('name'), //$('#browse_file_button', table).attr('name'),
+			autoSubmit: false,
+			responseType: 'json',
+			onChange: function(name, ext){
+				//alert("File name: " + name + " with extension " + ext);
+				selected_file.html(name).show('normal'); //$(".selected_file", table)
+				upload_button.attr('disabled', ''); //$(".upload_file_button", table)
+			},
+			onSubmit: function(){
+				//check the form
+				
+				//Set the label up
+				loading_label.show('normal').html('<span class="small_spinner">Loading...'); //$('.loading_file_label', table)
+				
+				//get the data
+				this.setData({
+					'cmd': 'upload',
+					'debug': 1,
+					'user_name': easyDAS.username,
+					'file_format': format_selector.val()
+				});
+				return true;
+			},
+			onComplete: fileUploadComplete
+		});
+		return file_upload;
+	};
+	
+	var setUploadButton = function(table){
+		upload_button.click(function(){ //$(".upload_file_button", table)
+			file_upload.submit();
+			});
+	};	
+	
+	var fileUploadComplete = function(file, data){
+		//$('#upload_file_spinner', table).remove();
+		selected_file.hide('normal'); //
+		if (!data || data.error) {
+			loading_label.html("Error"); //$('#loading_file_label')
+			alert(data.error.msg || "An error occurred");
+		}
+		else {
+			loading_label.text("Upload successful").hide('slow'); //$('.loading_file_label')
+			uploaded_file.html(file); //$('.current_file', table)
+			dialog.metadata = data;
+			dialog.enableNext(true);
+			
+			
+		}
+	};
+	
+	
+	
+	
+	var self = {
+		//Public Attributes
+		
+		
+		//Public Methods
+		id: function() {
+			return id;
+		},
+		label: function() {
+			return label;
+		},
+		getPanel: function(_dialog) {
+			if(!panel) {
+				createPanel();
+				dialog = _dialog;
+			}
+			return panel;
+		},
+		initPanel: function(metadata) {
+			setAjaxFileUpload(table);
+			setUploadButton(table);
+			dialog.canFinish(false);
+			dialog.enableNext(false);
+			
+		},
+		getPanelData: function(metadata) {
+			
+		}
+	};
+	
+	easyDAS.NewSourceDialog.Steps[id] = self;
+}());

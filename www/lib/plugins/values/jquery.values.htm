@@ -1,0 +1,166 @@
+<html>
+<head>
+    <title>jQuery Values Demo</title>
+    <style>
+.top {
+    font-size: 1.2em;
+}
+.leftpair {
+    width: 62%;
+}
+.middle {
+    float: right;
+    margin: 0px;
+    text-align: center;
+}
+.right {
+    float: right;
+    text-align: right;
+}
+.left {
+    text-align: left;
+}
+.bottom {
+    margin: -5px 5px;
+    text-align: center;
+}
+.box {
+    margin: 0px 5px;
+    padding: 5px;
+    border: 1px dotted black;
+}
+.source {
+    height: 15em;
+    width: 14em;
+}
+    </style>
+    <script type="text/javascript" src="jquery.1.3.2.js"></script>
+    <script type="text/javascript" src="jquery.values.js"></script>
+    <script type="text/javascript" src="log.js"></script>
+    <script type="text/javascript">
+$(function() {
+    $('.toleft').click(function() {
+        var values = $(this).parents('div.box').values();
+        var $left = $('.left').values(values);
+        log('Retrieved', values, 'and set to', $left);
+        return false;
+    });
+    $('.toright').click(function() {
+        var $this = $(this).parents('div.box');
+        var $right = $('.right').values($this);
+        log('Direct copied',$this,'to',$right);
+        return false;
+    });
+    $('.tomiddle').click(function() {
+        var values = $(this).parents('div.box').values();
+        var $middle = $('.middle').values(values);
+        log('Retrieved:', values, 'and set to', $middle);
+        return false;
+    });
+    $('.id').click(function() {
+        var id = $('.bottom').values('id');
+        $('.left,.right').values('id', id);
+        log('Retrieved id "'+id+'" and set to both .left and .right');
+        return false;
+    });
+});
+    </script>
+</head>
+<body>
+<div class="top box">
+    Enter values and use the buttons to copy/get/set them around the page.<br>
+    View the source to see how simple it is to deal identically with
+    manipulating values in totally different DOM structures.
+</div>
+<br clear="all">
+<div class="right box source" title="Right">
+    <label>id:</label>
+    <span name="id">right</span><br>
+    <label for="a">a:</label>
+    <textarea name="a"></textarea><br>
+    <label for="b">b:</label>
+    <select multiple="true" name="b">
+        <option>two</option>
+        <option>three</option>
+        <option>four</option>
+    </select><br>
+    <label for="c">c:</label>
+    5<input type="checkbox" name="c" value="five">
+    6<input type="checkbox" name="c" value="six">
+    7<input type="checkbox" name="c" value="seven">
+    <br>
+    <label for="d">d:</label>
+    <input type="radio" name="d" value="eight">8
+    <input type="radio" name="d" value="nine">9
+    <input type="radio" name="d" value="ten">10
+    <br>
+    <label for="e">e:</label>
+    <select name="e">
+        <option>eleven</option>
+        <option>twelve</option>
+    </select><br>
+    <label for="f">f:</label>
+    <input type="text" name="f" value=""><br>
+    <button class="toleft">&lt;&lt;-Left</button>
+    <button class="tomiddle">&lt;-Middle</button>
+</div>
+<div class="leftpair">
+<div class="middle box source" title="Middle">
+    <div class="row">
+        <span>id:</span>
+        <span name="id">middle</span>
+    </div>
+    <div class="row">
+        <span>f:</span>
+        <span name="f">one</span>
+    </div>
+    <div class="row">
+        <span>e:</span>
+        <span name="e">eleven</span>
+    </div>
+    <div class="row">
+        <span>d:</span>
+        <span name="d">ten</span>
+    </div>
+    <div class="row">
+        <span>c:</span>
+        <span name="c">seven</span>
+    </div>
+    <div class="row">
+        <span>b:</span>
+        <span name="b">three</span>
+    </div>
+    <div class="row">
+        <span>a:</span>
+        <span name="a">thirteen</span>
+    </div>
+    <br>
+    <button class="toleft">&lt;-Left</button>
+    <button class="toright">Right-&gt;</button>
+</div>
+<div class="left box source" title="Left">
+    <label>id:</label>
+    <span name="id">left</span><br>
+    <label for="a">a:</label>
+    <input type="text" name="a" value="one"><br>
+    <label for="b">b:</label>
+    <input type="text" name="b" value="two,four"><br>
+    <label for="c">c:</label>
+    <input type="text" name="c" value="five,six"><br>
+    <label for="d">d:</label>
+    <input type="text" name="d" value="nine"><br>
+    <label for="e">e:</label>
+    <input type="text" name="e" value="twelve"><br>
+    <label for="f">f:</label>
+    <input type="text" name="f" value="thirteen"><br>
+    <button class="tomiddle">Middle-&gt;</button>
+    <button class="toright">Right-&gt;&gt;</button>
+</div>
+</div>
+<br clear="all">
+<div class="bottom box">
+    <input type="text" name="id" value="foobar">
+    <button class="id">Update Left & Right Ids Only</button>
+</div>
+</body>
+</html>

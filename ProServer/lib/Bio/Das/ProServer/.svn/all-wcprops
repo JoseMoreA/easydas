@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svnroot/proserver/!svn/ver/585/trunk/lib/Bio/Das/ProServer
+END
+Config.pm
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svnroot/proserver/!svn/ver/548/trunk/lib/Bio/Das/ProServer/Config.pm
+END
+SourceHydra.pm
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svnroot/proserver/!svn/ver/549/trunk/lib/Bio/Das/ProServer/SourceHydra.pm
+END
+Authenticator.pm
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svnroot/proserver/!svn/ver/549/trunk/lib/Bio/Das/ProServer/Authenticator.pm
+END
+SourceAdaptor.pm
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svnroot/proserver/!svn/ver/583/trunk/lib/Bio/Das/ProServer/SourceAdaptor.pm
+END

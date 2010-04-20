@@ -1,0 +1,71 @@
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svnroot/proserver/!svn/ver/569/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport
+END
+ensembl.pm
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svnroot/proserver/!svn/ver/569/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/ensembl.pm
+END
+oracle.pm
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svnroot/proserver/!svn/ver/528/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/oracle.pm
+END
+getz.pm
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svnroot/proserver/!svn/ver/528/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/getz.pm
+END
+bioseqio.pm
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svnroot/proserver/!svn/ver/528/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/bioseqio.pm
+END
+csv.pm
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svnroot/proserver/!svn/ver/531/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/csv.pm
+END
+generic.pm
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svnroot/proserver/!svn/ver/528/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/generic.pm
+END
+bed12.pm
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svnroot/proserver/!svn/ver/548/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/bed12.pm
+END
+dbi.pm
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svnroot/proserver/!svn/ver/559/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/dbi.pm
+END
+file.pm
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svnroot/proserver/!svn/ver/567/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/file.pm
+END
+wgetz.pm
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svnroot/proserver/!svn/ver/548/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/wgetz.pm
+END
+sif.pm
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svnroot/proserver/!svn/ver/544/trunk/lib/Bio/Das/ProServer/SourceAdaptor/Transport/sif.pm
+END

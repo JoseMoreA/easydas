@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svnroot/proserver/!svn/ver/558/trunk/lib/Bio/Das/ProServer/Authenticator
+END
+ip.pm
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svnroot/proserver/!svn/ver/453/trunk/lib/Bio/Das/ProServer/Authenticator/ip.pm
+END
+http.pm
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svnroot/proserver/!svn/ver/558/trunk/lib/Bio/Das/ProServer/Authenticator/http.pm
+END

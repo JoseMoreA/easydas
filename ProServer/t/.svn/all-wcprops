@@ -1,0 +1,119 @@
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/svnroot/proserver/!svn/ver/583/trunk/t
+END
+critic.t
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svnroot/proserver/!svn/ver/526/trunk/t/critic.t
+END
+11-transport-oracle.t
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svnroot/proserver/!svn/ver/453/trunk/t/11-transport-oracle.t
+END
+distribution.t
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svnroot/proserver/!svn/ver/560/trunk/t/distribution.t
+END
+27-volmap.t
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svnroot/proserver/!svn/ver/453/trunk/t/27-volmap.t
+END
+11-transport-generic.t
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svnroot/proserver/!svn/ver/453/trunk/t/11-transport-generic.t
+END
+05-config.t
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svnroot/proserver/!svn/ver/453/trunk/t/05-config.t
+END
+11-transport-file.t
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svnroot/proserver/!svn/ver/453/trunk/t/11-transport-file.t
+END
+32-auth-ip.t
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svnroot/proserver/!svn/ver/453/trunk/t/32-auth-ip.t
+END
+10-sourceadaptor.t
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svnroot/proserver/!svn/ver/582/trunk/t/10-sourceadaptor.t
+END
+11-transport-sif.t
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svnroot/proserver/!svn/ver/538/trunk/t/11-transport-sif.t
+END
+16-targets.t
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svnroot/proserver/!svn/ver/453/trunk/t/16-targets.t
+END
+21-features.t
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svnroot/proserver/!svn/ver/526/trunk/t/21-features.t
+END
+00-pod.t
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svnroot/proserver/!svn/ver/453/trunk/t/00-pod.t
+END
+33-auth-http.t
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svnroot/proserver/!svn/ver/558/trunk/t/33-auth-http.t
+END
+25-alignment.t
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svnroot/proserver/!svn/ver/526/trunk/t/25-alignment.t
+END
+26-interaction.t
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svnroot/proserver/!svn/ver/453/trunk/t/26-interaction.t
+END
+21-features-versions.t
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svnroot/proserver/!svn/ver/526/trunk/t/21-features-versions.t
+END
+11-transport-dbi.t
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svnroot/proserver/!svn/ver/453/trunk/t/11-transport-dbi.t
+END
+15-escaping.t
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svnroot/proserver/!svn/ver/583/trunk/t/15-escaping.t
+END

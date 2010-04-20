@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svnroot/proserver/!svn/ver/528/trunk/stylesheets
+END
+xsl_dsn.xsl
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svnroot/proserver/!svn/ver/463/trunk/stylesheets/xsl_dsn.xsl
+END
+xsl_sequence.xsl
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svnroot/proserver/!svn/ver/528/trunk/stylesheets/xsl_sequence.xsl
+END
+xsl_features.xsl
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svnroot/proserver/!svn/ver/453/trunk/stylesheets/xsl_features.xsl
+END
+xsl_sources.xsl
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svnroot/proserver/!svn/ver/453/trunk/stylesheets/xsl_sources.xsl
+END

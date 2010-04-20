@@ -1,0 +1,136 @@
+#!/sw/arch/bin/perl
+
+##!/usr/bin/perl
+
+# easyDAS
+# Copyright (C) 2008-2009 Bernat Gel 
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+#This script fetches the required features from an arbitrary DAS source and returns them in JSON format
+
+use strict;
+use lib qw(./perllib);
+use POSIX qw(ceil floor);
+use CGI::Carp qw(fatalsToBrowser);
+use CGI;
+use Data::Dumper;
+
+use easyDAS::DBInterface;
+
+use JSON;
+use DBI;
+
+use User::Simple;
+
+my $DAS_SERVER_HOSTNAME ='wwwdev.ebi.ac.uk/das-srv/easydas';
+my $DAS_SERVER_PORT;
+
+#Get the query object
+my $query = new CGI;
+
+#Get the basic parameters
+my $cmd = $query->param('cmd');
+my $debug = ($query->param('debug'))?1:0;
+
+my $username = undef;
+
+#initialize
+  print $query->header(-type=>(($debug)?'text/html':'application/json'));
+  my $doc_text = "";
+  
+
+  
+  #Begin
+  my $config = &read_config;
+  my $db=$config->{'DB'};
+  my $dbh = DBI->connect("DBI:mysql:database=".$db->{'db'}.";host=".$db->{'host'}.":".$db->{'port'},$db->{'user'},$db->{'password'}, {RaiseError => 1, AutoCommit=>1});
+
+  my $user_table = "Users";
+  my $usr = User::Simple->new(db => $dbh, tbl=>$user_table);
+
+
+if($cmd eq 'get_all_sources') { #this commands retreives all the sources in easyDAS
+  my $DB = easyDAS::DBInterface->new($debug);
+  $doc_text = $DB->get_all_sources($username);
+} else { 
+  #Begin user restricted commands
+  if(!&logged_in) {
+    $doc_text .= qq({"error": {"id": "not_logged_in", msg: 'You are not curently logged in'});
+  } else {
+    $username = $usr->login;
+
+    my $DB = easyDAS::DBInterface->new($debug);
+
+    #execute the command
+    if($cmd eq 'get_sources') {
+
+      $doc_text = $DB->get_sources($username);
+
+    } elsif($cmd eq 'remove_source') {
+      my $source_id = $query->param('source_id');
+      if(!$source_id) {
+	$doc_text .= qq({"error": {"id": "no_source_id", msg: 'No source_id was provided when trying to remove a source'});
+      } else {
+	$doc_text .= "{";
+	my $removed = $DB->remove_source($source_id, $username);
+	if($removed) {
+	  $doc_text .= '"sources": '.$DB->get_sources($username);
+	}
+	$doc_text .= "}";
+
+      }
+    } elsif($cmd eq 'get_user_info') {
+      my $un = $usr->login;
+      my $sn = $usr->server_name;
+      my $email = $usr->email;
+
+      $doc_text .= qq({"username": "$un", "server_name": "$sn", "email": "$email"});
+    }
+  }
+}
+print substitute($doc_text);
+
+
+exit(0);
+
+
+sub logged_in {
+  my $session = $query->cookie('sessionID');
+  return (($session and $usr->ck_session($session))?1:0);
+    
+}
+
+sub read_config {
+  open (CONF, "< ./config.json") || die "<h1> Can't Open config.json to read the config</h1>";
+  my @lines = <CONF>;
+  my $lines = join("", @lines);
+  my $config = JSON->new->decode($lines);
+
+  return $config;
+}
+
+#TODO: THis is the same as the function in easyDAS.pl!!!! 
+#Substitutes some key text with runtime values
+# currently {DASHOST} by the name of the host we are
+sub substitute {
+  my ($str) = @_;
+
+  my $das_hostname = $DAS_SERVER_HOSTNAME || $ENV{'SERVER_NAME'};
+  my $das_host = 'http://'.$das_hostname.($DAS_SERVER_PORT?':'.$DAS_SERVER_PORT:''); #TODO: Check if http is there before adding it
+  $str =~ s/{DASHOST}/$das_host/g;
+  
+  return $str;
+}
+ 

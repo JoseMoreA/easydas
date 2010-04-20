@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/openid/!svn/ver/176/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID
+END
+IndirectMessage.pm
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/openid/!svn/ver/158/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/IndirectMessage.pm
+END
+VerifiedIdentity.pm
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/openid/!svn/ver/158/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/VerifiedIdentity.pm
+END
+ClaimedIdentity.pm
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/openid/!svn/ver/158/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/ClaimedIdentity.pm
+END
+URIFetch.pm
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/openid/!svn/ver/158/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/URIFetch.pm
+END
+Yadis.pm
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/openid/!svn/ver/176/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/Yadis.pm
+END
+Consumer.pm
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/openid/!svn/ver/173/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/Consumer.pm
+END
+Association.pm
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/openid/!svn/ver/158/branches/1.0/perl/Net-OpenID-Consumer/lib/Net/OpenID/Association.pm
+END

@@ -1,0 +1,111 @@
+#########
+# Author:        bernat gel
+# Created:       2003-05-20
+#
+# DBHAndler
+#
+# This file contains the class easyDAS::DBHandler
+#
+
+package easyDAS::DBInterface;
+
+use strict;
+use warnings;
+
+use Carp;
+use Data::Dumper;
+use DBI;
+
+#DB CONFIG
+my $db='easyDAS';
+my $host = 'localhost';
+my $user='root';
+my $password = 'root';
+
+
+sub new {
+  my ($class, $meta, $debug) = @_;
+
+
+
+  $dbh = DBI->connect("DBI:mysql:database=$db;host=$host", $user, $password, {RaiseError => 1});
+    
+  my $self = {
+              'metadata' => $meta,
+	      'filename' => $meta->{'file_id'},
+	      'debug'    => $debug || 0,
+	      'min_score_threshold' => 80 #The fixed score beyond the file is accepted as being of that filetype
+             };
+
+  bless $self, $class;
+  return $self;
+}
+
+#######################################################################################################
+#												      #
+#				Public Function                                                       #
+#												      #
+#######################################################################################################
+
+#Tests the file and tries to find
+sub test {
+  my ($self) = @_;
+
+  #my $metadata = $meta->metadata;
+   
+  #set a flag saying we don't know the format
+  $self->metadata->parsing->{'format_guesing_success'} = 0;
+  #Try to infer the file format of $file and then try to get the most of it
+  print qq(Begin Testing....) if($self->debug);
+  #TODO: Maybe some basic heuristics to guide the search... (start with the formats accepting the file extension, test a couple of lines...)
+  #TODO: Take into account the information supplied by the user
+ 
+  
+  #Test GFF
+    my $temp_metadata = clone($self->metadata); #Prepare a cloned metadata for the adaptor to play
+    my $gff = easyDAS::InputAdaptor::GFF->new($temp_metadata, {debug=>$self->debug}); #Create the GFF adaptor
+    $gff->test();
+    
+    #if successful
+    if($temp_metadata->parsing->{'format_score'} >= $self->{'min_threshold_score'}) {
+      $temp_metadata->{'format_guessing_sucess'}=1;
+      $self->metadata($temp_metadata);
+    } else {
+	print "TEST OTHER MORE GENERIC FORMATS";
+    }
+
+  return $self->metadata;
+}
+
+
+
+
+
+#######################################################################################################
+#												      #
+#				Utility Functions                                                     #
+#												      #
+#######################################################################################################
+
+sub _fh {
+  my $self = shift;
+
+  if(!$self->{'fh'}) {
+    my $fn = $self->{'filename'};
+    open $self->{'fh'}, q(<), $fn or croak qq(Could not open $fn);
+  }
+  return $self->{'fh'};
+}
+
+sub debug {
+  my ($self) = @_;
+  return $self->{'debug'};
+}
+
+sub metadata {
+  my ($self, $value) = @_;
+  $self->{'metadata'}=$value if(defined $value);
+  return $self->{'metadata'};
+}
+
+1;

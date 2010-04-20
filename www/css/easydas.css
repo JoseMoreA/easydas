@@ -1,0 +1,334 @@
+/* ------------------------------------------------------------
+	Reset Styles (from meyerweb.com)
+------------------------------------------------------------ */
+
+/*a,*/
+
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+abbr, acronym, address, big, cite, code,
+del, dfn, em, font, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	outline: 0;
+	font-weight: inherit;
+	font-style: inherit;
+	font-size: 100%;
+	font-family: inherit;
+	vertical-align: baseline;
+}
+
+button, input, select {
+	font-weight: inherit;
+	font-style: inherit;
+	font-size: 100%;
+	font-family: inherit;
+}
+
+
+/* ------------------------------------------------------------
+	General Styles
+------------------------------------------------------------ */
+
+body {
+	background: white;
+	color: black;
+}
+
+/*font-family: Gotham, Helvetica, Arial, sans-serif;*/
+.maincontent {
+	margin: 0 0 40px 0;
+	float: left;
+	width: 100%;
+}
+
+
+/**********************  UTILITY DEFS   **************************************************************/
+
+
+.round {-webkit-border-radius:5px;-moz-border-radius:5px;border-radius: 5px;}
+.shadow {-webkit-box-shadow: rgba(0,0,0,0.5) 2px 2px 2px;-moz-box-shadow: rgba(0,0,0,0.5) 2px 2px 2px; /* FF 3.5+ */}
+.cursor_hand {cursor: hand;}
+.scrolling {overflow: auto;}
+
+.small_spinner {background-image: url(../images/wait.gif); width: 20px; height: 20px; display:inline-block;}
+
+.fixed_width_5em {width: 5em;}
+.fixed_width_10em {width: 10em;}
+.spacer {display: inline-block;}
+.no_left_border {border-left:none}
+
+.error_message {color:red; font-size:smaller;}
+
+.link_like {color: blue; text-decoration: underline; cursor: pointer;}
+
+.floating {position: absolute;}
+
+
+
+.remove_button {display:inline-block;background-image: url(../images/remove.png); background-repeat: no-repeat; width: 16px; height: 16px; cursor: pointer;}
+.edit_button {display: inline-block;background-image: url(../images/edit.png); background-repeat: no-repeat; width: 16px; height: 16px; cursor: pointer;}
+
+
+.loading {background: transparent url(../images/tree/small_wait.gif) no-repeat 0 0; padding-left: 12px;}
+
+
+input.error {background-color: #FFBBBB;} /*background: transparent url(../images/remove.png) no-repeat 0 0; padding-left: 18px;}*/
+label.error {color: red;}
+
+.text_right {text-align: right;}
+.red {color: red;}
+.centered {text-align: center;}
+
+.notification {width: 100%; font-weight: bolder;}
+
+.scrolling {overflow: auto;}
+
+
+
+
+
+fieldset.aligned_fields p {padding: 0.2em;}
+fieldset.aligned_fields label {width: 10em; display: inline-block;}
+fieldset.aligned_fields .field {min-width: 10em; display: inline-block;}
+.star {float: right;color: red;margin-right: 5px;}
+/*.cross_button {background-image: url(../images/cross.png); background-position: center; background-repeat: no-repeat; height: 20px; width: 20px; vertical-align: middle; }*/
+
+/*********** WAITING **************************/
+.waiting td {vertical-align: middle;}
+.waiting .label {padding-left: 1em;}
+
+
+/********** TOP-RIGHT OPTIONS  ****************/
+.top_options {
+	float:right;
+	margin-right: 1em;
+	font-weight: normal;
+}
+
+.top_options div {display: inline-block;}
+
+
+/***************ADMIN**************************/
+.admin_main_div {border: 1px solid #888888; padding: 1em; display: block; background-color: #EEEEEE;}
+
+.admin_main_div .title {font-size:large; background: inherit; margin:0;}
+
+.source_button {float: right; padding-left: 0.5em;}
+
+.admin_out_panel {padding: 1em; display: block; border: 1px solid; background-color: #FAFAFA;}
+#admin_content {padding: 0;}
+
+
+#admin_tabs {position: relative; bottom: -1px; padding-left: 1em;}
+#admin_tabs>li {display: inline-block; padding: 0.5em 0 0.5em 0; border: 1px solid; 
+				background: #dfdfdf; border-color: #444444; color: #222222; padding: 0.2em 0.5em; cursor: pointer;
+				border-radius-topleft: 2px; -moz-border-radius-topleft:2px; -webkit-border-top-left-radius:2px;
+				border-radius-topright: 2px; -moz-border-radius-topright:2px; -webkit-border-top-right-radius:2px;
+				border-bottom-color: black;
+				margin-left: 2px;}
+#admin_tabs>li:hover {color: black;}
+#admin_tabs>li.selected {color: #black; border-bottom-color: #FAFAFA; background-color: #FAFAFA;}
+#admin_tabs>li.disabled {color: #BBBBBB;}
+
+.admin_panel {padding:2px; overflow:auto;}
+
+
+#main_panel_buttons {
+    float: right;
+    margin-right: 2em;
+	position: relative;
+	top: -2em;
+}
+
+
+
+
+/************************LOGIN************************************/
+#logout_link {margin-left: 10px;}
+#login_window {display: none; position:absolute; margin: 0 auto; width: 870px; top: 100px; background-color: #BBBBBB; border: 2px solid #999999; padding: 5px; z-index:100; font-size: small;}
+
+.login_box {width: 420px; background-color: #FAFAFA; padding: 5px; border: 1px solid #444444;}
+.login_box.left {float: left;}
+.login_box.right {float: right;}
+
+.login_box .title_bar  {font-size:medium; font-weight: bolder; text-align: center; background-color: #555555; color: white; padding: 2px; margin-bottom: 1em;}
+
+.login_box p {font-weight: bold;}
+
+.login_box .content fieldset {background-color: #EAEAEA; padding: 5px; margin-top: 1em; border: 1px solid #AAAAAA;}/*{border: 1px solid black; padding: 1em; -webkit-border-radius:5px;-moz-border-radius:5px;border-radius: 5px;}*/
+.login_box .content fieldset legend {background-color:#CCCCCC;border:1px solid #777777;padding:2px;}
+.login_box .content fieldset fieldset {background-color:#DDDDDD;padding:0.5em; border: 1px solid #444444;}
+/*.login_box .content fieldset fieldset legend {background-color:#CCCCCC;border:1px solid #777777;padding:5px;}*/
+.login_box label {width: 8em; float: left; margin-right: 10px; clear: left;}
+.login_box input {width: 15em; float: left;}
+
+.login_box .openid_label {width: 20px;}
+.login_box .openid_input {width: 20em;}
+
+#login_window .buttons {width: 100%; text-align: center; padding-top: 5px; clear: both;}
+
+
+/************** SOURCES TABLE **************/
+	.source_table {
+background-color:#FFFFFF;
+border:1px solid black;
+border-collapse:collapse;
+margin:auto;
+padding:0.5em;
+text-align:center;
+}
+
+.source_table thead {
+background-color:#BBBBBB;
+border:1px solid #888888;
+font-size:larger;
+}
+.source_table tbody td {
+border:1px solid #888888;
+padding:0.5em;
+vertical-align: middle;
+}
+	.source_name {padding-right: 2em; font-weight: bolder; align: left;}
+	.extended_info  {min-width: 200px; border: 1px solid #BBBBBB; margin-top: 1em; padding: 2em; background-color: #EEEEEE; text-align: left;}
+	.extended_info ul {padding-right: 1.5em;}
+	
+/*************DIALOG******************************/
+
+
+
+.dialog {
+	display: none; position:absolute; margin: 0 auto; top: 100px; background-color: #BBBBBB; border: 2px solid #DDDDDD; padding: 5px; z-index:100; font-size: small; z-index: 110;
+}
+
+
+
+.dialog .title_bar {
+	font-size:medium; font-weight: bolder; text-align: center; background-color: #555555; color: white; padding: 2px; margin-bottom: 1em;
+}
+
+.dialog .title_container {
+	display: inline-block;
+}
+.dialog .close_button {
+	display: inline-block;
+	background: transparent url(../images/close.png) no-repeat;
+	width: 16px;
+	height: 16px;
+	float: right;
+	margin-right: 5px;
+	position:relative;
+	top: 0.15em;
+	cursor: pointer;
+}
+
+.dialog .left {float: left;}
+.dialog .right {float: right;}
+
+.dialog .body_container {}
+.dialog .buttons_container {margin-top: 5px;}
+.dialog .inner_panel {background-color: #FAFAFA; padding: 5px; border: 1px solid #444444;}
+
+.dialog fieldset {border: 1px solid #888888; padding: 0 5px 2px; background-color: #EEEEEE; margin-top: 5px;}
+
+.dialog legend {background-color:#CCCCCC;border:1px solid #777777;padding:2px; margin: 3px;}
+
+.mask {position:absolute; z-index:99; background-color:#000; opacity: 0;}  
+     
+
+/**************DIALOG PANELS**********************/
+	/************************UPLOAD*************************/
+	.file_name{display: inline; font-weight: bolder; font-size: small;}
+	.loading_file_label {display: inline-block;}	
+	
+	/*******************FILE TYPE************************/
+	
+	.preview_table {border-collapse: collapse; border: 1px solid black; margin: 2px;}
+	.preview_table td {border: 1px solid black; padding: 1px;}
+	.preview_table tbody {background-color: white;}
+	.preview_table thead th {background-color: #444444; color: #EAEAEA; padding: 1px 5px;}
+	.preview_table .no_left_border {border-left:hidden;}
+	
+	
+/*************END DIALOG PANELS ***************************/
+
+
+/****************** DATA TABLE ********************/
+.data_table {border: 2px solid #444444;	text-align: center;	padding: 1em;	border-collapse: collapse;font-family:Arial, Helvetica, sans-serif; vertical-align: middle;}
+.data_table thead { background-color: #e3ca4b;}
+.data_table th, .data_table td{border: 1px solid #888888; padding: 0.5em;}
+.data_table th {font-weight: bold; border-bottom-width: 2px;border-bottom-color: #444444;}
+.data_table .text_input {width: 10em;}
+.data_table .no_left_border {border-left:hidden;}
+.data_table tr.selected {background-color: #EEEEFF};
+
+
+
+
+
+/************************** COORDINATES SYSTEM SELECTION ***************************/
+.current_coordSel_field {min-width: 10em; display: inline-block; background-color: #BBBBBB;}
+#coordSelAvailableCoords {padding: 0.5em;}
+#coordSelAvailableCoords option:hover {background-color: #8888cc;}
+
+#coordSelCurrent {background-color: #EAEAEA;}
+
+/***************************ONTOLOGY PICK ***************************************/
+
+.oPick.frame {position: absolute; background-color: #e6e3cc; border: 2px solid #b6b39c;}
+.oPick .oPick_content {border: 1px solid #444; background-color: #DDD; padding: 0.6em;}
+
+.oPick .title_bar {background-color:#AAAAAA;border:1px solid black;font-size:larger;font-weight:bold;padding:0.5em;text-align:center;}
+
+.oPick .tabs li {display: inline-block; background-color:#CCC; border: 1px solid #444; cursor:pointer; position: relative; top: 1px; padding: 0.2em;}
+.oPick .tabs li:hover {display: inline-block; background-color:#DDE; border: 1px solid #444; cursor:pointer; position: relative; top: 1px;}
+.oPick .tabs li.selected {background-color:#DDD; border-bottom: 1px solid #DDD; }
+.oPick .tabs li.selected:hover { }
+
+.oPick label {width: 5em; float: left; vertical-align: middle;}
+
+.oPick .tree_viewer {background-color: transparent;}
+.tree_viewer table {border-collapse: collapse; padding: 0; margin: 0;}
+.tree_viewer td {vertical-align: middle;}
+.tree_viewer .vline {background: transparent url(../images/tree/vline.png) repeat-y;}
+.tree_viewer .vline.last {background-image: none;}
+.tree_viewer .tree_structure {width: 13px; height: 16px; display:block;}
+.tree_viewer .collapsed {background: transparent url(../images/tree/plust.png) no-repeat;}
+.tree_viewer .collapsed:hover {background: transparent url(../images/tree/plusth.png) no-repeat;}
+.tree_viewer .expanded {background: transparent url(../images/tree/minust.png) no-repeat;}
+.tree_viewer .expanded:hover {background: transparent url(../images/tree/minusth.png) no-repeat;}
+.tree_viewer .collapsed.last {background: transparent url(../images/tree/plus.png) no-repeat;}
+.tree_viewer .collapsed.last:hover {background: transparent url(../images/tree/plush.png) no-repeat;}
+.tree_viewer .expanded.last {background: transparent url(../images/tree/minus.png) no-repeat;}
+.tree_viewer .expanded.last:hover {background: transparent url(../images/tree/minush.png) no-repeat;}
+/*LEAFS*/
+.tree_viewer .leaf {background-image:url(../images/tree/linet.png);}
+.tree_viewer .leaf:hover {background-image: url(../images/tree/linet.png);}
+.tree_viewer .leaf.last {background-image:url(../images/tree/line.png);}
+.tree_viewer .leaf.last:hover {background-image: url(../images/tree/line.png);}
+/*TERMS*/
+.tree_viewer .term {cursor: pointer;}
+.tree_viewer .term:hover {background-color: #cccc99;}
+.tree_viewer .term.selected {background-color: #8888cc;}
+.tree_viewer .loading {background: transparent url(../images/tree/small_wait.gif) no-repeat 0 0; color: #444488; padding-left: 12px;}
+
+/*SEARCH*/
+
+.oPick .search_results  {border-top: white; padding: 5px;}
+.ontoS_res_table {background-color: #EEEEEE; border: 1px solid #444444; border-collapse: collapse; margin-top: 1em; width: 100%;}
+.ontoS_res_table th {background-color: #8888EE; font-weight: bold;}
+.ontoS_res_table .first {padding-left: 1em;}
+.ontoS_res_table td {padding-right: 5px; cursor: pointer;}
+.ontoS_res_table .ontoS_plus {font-weight: bolder;}
+.ontoS_res_table tr.even {background-color: #DDDDEE;}
+.ontoS_res_table tr.odd {background-color: #CCCCEE;}
+.ontoS_res_table tr.selected {background-color: #AAAAcc;}
+
+
+
+

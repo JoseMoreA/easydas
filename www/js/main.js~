@@ -1,0 +1,44 @@
+/**
+ * @author bernat
+ */
+/**This is the main function of easyDAS. It takes care of the system initialization and then handles the control to the controller*/
+
+var easyDAS = (easyDAS)?easyDAS:{};
+
+$(document).ready(function(){
+
+	//initialize the controller
+	easyDAS.Controller.init({
+		'main_el': $("#amin_ui"),
+		'tabs_el': $('#admin_tabs'),
+		'panel_container_el': $('#admin_content')
+	});
+	
+	
+	//initialize the UI
+	$('.create_source').live('click', function(){
+		//Prior to dowloading, check the if the user has logged in
+		$.get('../cgi-bin/login.pl', {
+			'cmd': 'check'
+		}, function(response){
+			if (!response.loggedin) {
+				var ok = confirm("You are not logged in. Any source you created will be published as 'anonymous' \n" +
+				"and you won't be able to change it after its initial creation process.\n" +
+				"Do you want to proceed?");
+				if (ok) {
+					easyDAS.NewSourceDialog.start();
+				}
+			}
+			else {
+				easyDAS.NewSourceDialog.start();
+			}
+		}, 'json');
+	});
+	
+	
+	//handle control
+	easyDAS.Controller.start();
+	
+	
+});
+

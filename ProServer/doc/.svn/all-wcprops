@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 41
+/svnroot/proserver/!svn/ver/542/trunk/doc
+END
+proserver_guide.html
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svnroot/proserver/!svn/ver/541/trunk/doc/proserver_guide.html
+END
+pod2html
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svnroot/proserver/!svn/ver/453/trunk/doc/pod2html
+END
+CHANGES_2.7.txt
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svnroot/proserver/!svn/ver/453/trunk/doc/CHANGES_2.7.txt
+END
+proserver_tutorial.html
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svnroot/proserver/!svn/ver/530/trunk/doc/proserver_tutorial.html
+END
+CHANGES_2.9.txt
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svnroot/proserver/!svn/ver/542/trunk/doc/CHANGES_2.9.txt
+END

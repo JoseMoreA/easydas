@@ -1,0 +1,717 @@
+#########
+# Author:        bernat gel
+# Created:       2003-05-20
+#
+# DBHAndler
+#
+# This file contains the class easyDAS::DBInterface
+#
+
+package easyDAS::DBInterface;
+
+use strict;
+use warnings;
+
+use Carp;
+use Data::Dumper;
+use DBI;
+
+use Cwd;
+use JSON;
+
+#should it be in config??
+my $TEST_REGION_MAX_LENGTH = 10000;
+
+sub new {
+  my ($class, $debug) = @_;
+
+  open (CONF, "< ./config.json") || die "<h1> Can't Open config.json to read the config</h1>";
+  my @lines = <CONF>;
+  my $lines = join("", @lines);
+  my $config = JSON->new->decode($lines);
+
+  my $db=$config->{'DB'};
+  my $dbh = DBI->connect("DBI:mysql:database=".$db->{'db'}.";host=".$db->{'host'}.":".$db->{'port'},$db->{'user'},$db->{'password'}, {RaiseError => 1, AutoCommit=>1});
+    
+  my $self = {
+	      'dbh'	 => $dbh,
+              'debug'    => $debug || $config->{'debug'} || 0,
+	      'config'   => $config,
+	      #'segment_cache' => {}
+	      'server_names' => {}
+             };
+  
+  bless $self, $class;
+  
+  return $self;
+}
+
+sub debug {
+  my ($self) = @_;
+  return $self->{'debug'};
+}
+
+##########################################################
+#                                                        #
+#             Interface Methods                          #
+#                                                        #
+##########################################################
+
+#Creates a source in the DB. 
+# NOTE: This version receives the data of the whole file in the second argument. A streaming version should be added for other formats.
+sub create_source {
+  my ($self, $metadata, $parsed_data) = @_;
+  
+  my $source_name = $metadata->source->{'source_name'};
+  $self->source($source_name) if(defined $source_name);
+  print qq(Called DB newSource: ).$self->source.qq(<br>\n) if($self->debug);
+
+  #check if the data is valid
+    #user authenticated?
+    my $username = $metadata->user->{'username'} || 'anonymous';
+        
+    #source_name unique for that user?
+    if(!$self->check_source_unique($username, $source_name)) {
+      $metadata->error({'id' => 'source_name_not_unique', 
+			'msg' => "A source with name -$source_name- already exists. Please, change the name or edit/delete the existing source",
+			'additional_info' => $self->get_source_by_name($username, $source_name)->{'id'}
+      });
+      return;
+    }
+    
+    
+  #Create, if necessary, the user-global types table
+  my $user_types_table_sth = $self->dbh->prepare($self->create_user_types_table_sql($username));
+  $user_types_table_sth->execute();
+  
+  #Create, if necessary, the user-global methods table
+  my $user_methods_table_sth = $self->dbh->prepare($self->create_user_methods_table_sql($username));
+  $user_methods_table_sth->execute();
+  
+  #Create the Source_specific tables
+    #features table
+    my $features_table_sth = $self->dbh->prepare($self->create_features_table_sql($username, $source_name));
+    $features_table_sth->execute();
+    #types table
+    my $types_table_sth = $self->dbh->prepare($self->create_types_table_sql($username, $source_name));
+    $types_table_sth->execute();
+    #methods table
+    my $methods_table_sth = $self->dbh->prepare($self->create_methods_table_sql($username, $source_name));
+    $methods_table_sth->execute();
+    #segments table
+    my $segments_table_sth = $self->dbh->prepare($self->create_segments_table_sql($username, $source_name));
+    $segments_table_sth->execute();
+    #links table
+    my $links_table_sth = $self->dbh->prepare($self->create_links_table_sql($username, $source_name));
+    $links_table_sth->execute();
+    #notes table
+    my $notes_table_sth = $self->dbh->prepare($self->create_notes_table_sql($username, $source_name));
+    $notes_table_sth->execute();
+
+  #add data
+  $self->addFeatures($username, $source_name, $parsed_data->{'features'});
+  $self->addTypes($username, $source_name, $metadata->types);
+  $self->addMethods($username, $source_name, $metadata->methods);
+
+
+  #modify the Sources main table to add the source
+  my $source = $metadata->source;
+  my $coords = $metadata->coordinates_system;
+  my $insert_source = $self->dbh->prepare("INSERT INTO Sources VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)");
+  $insert_source->execute($source->{'source_name'},
+			  $source->{'source_title'},
+			  $source->{'source_description'},
+			  $source->{'source_mantainer'},
+			  $username,
+			  $source->{'doc_href'},
+			  0,
+			  ($coords && $coords->{'uri'})?$coords->{'uri'}:undef, #use the uri as the id
+			  ($coords)?JSON->new->encode($coords):undef, #encode it in JSON to store the complete definition into de DB,
+			  $self->get_test_range($parsed_data->{'features'}) #create a test range from the features info. Before this field there are two time other ones in the DB
+   );
+  
+}
+
+
+sub getSegmentIdFromDB {
+  my ($self, $seg_name,$username, $source) = @_;
+
+  my $seg_info = $self->dbh->prepare_cached(q(SELECT id FROM `easydas`.`).$self->segments_table_name($username, $source).q(` WHERE `entry_point` = ? LIMIT 1));
+  eval{$seg_info->execute($seg_name)};
+  if($@) {
+    return -1;
+  }
+  my @res = $seg_info->fetchrow_array();
+  if($seg_info->err()) {
+    return -1;
+  }
+  #$self->{'segment_cache'}->{$seg_name} = @res[0]; #TODO: Activate the cache
+  return @res[0];
+}
+
+
+sub getSegmentId {
+  my ($self, $seg_name,$username, $source) = @_;
+
+
+
+  #check if it's on the cache
+  #print "Segment Cache: ".Dumper($self);
+  my $seg_id; # = $self->{'segment_cache'}->{$seg_name};
+  #return if($seg_id);
+  #TODO: Activate the cache
+
+  #Check if the segment is on the table 
+  $seg_id = $self->getSegmentIdFromDB($seg_name, $username, $source);
+  return $seg_id if(defined($seg_id) && $seg_id != -1);
+
+  #if it's not on the table, add it and return the id of the newly generated segment
+  my $insert_segment =  $self->dbh->prepare("INSERT INTO `".$self->segments_table_name($username, $source)."` VALUES(?, ?, ?, ?)");
+  #TODO: Get the right values for version and label
+  #TODO: If a reference server was specified, try to use it to get the needed info...?
+  $insert_segment->execute(0, $seg_name, '1.0', $seg_name);
+  #and get the id (is autoincrement, so we don't specify it and have to retrieve it from the DB)
+  $seg_id = $self->getSegmentIdFromDB($seg_name, $username, $source);
+  return $seg_id if($seg_id != -1);
+  
+  #If we are here, something strange happened, return an error 
+  return -1;
+}
+
+
+sub addLinks {
+  my ($self, $f_id, $f, $username, $source) = @_;
+  return unless($f->links);
+ 
+  #Add it to the table;
+  my $insert_link =  $self->dbh->prepare("INSERT INTO `".$self->links_table_name($username, $source)."` VALUES(NULL, ?, ?, ?)");
+  if(ref($f->links) eq 'ARRAY') {
+    for my $l (@{$f->links}) {
+      $insert_link->execute($f_id, $l, $l); #TODO: If more information was available (link label), save it
+    }
+  } else {
+    $insert_link->execute($f_id, $f->links, $f->links);
+  }
+}
+
+sub addNotes {
+  my ($self, $f_id, $f, $username, $source) = @_;
+  return unless($f->notes);
+  my $insert_note =  $self->dbh->prepare("INSERT INTO `".$self->notes_table_name($username, $source)."` VALUES(NULL, ?, ?)");
+
+  if(ref($f->notes) eq 'ARRAY') {
+    for my $n (@{$f->notes}) {
+      $insert_note->execute($f_id, $n);
+    }
+  } else {
+    $insert_note->execute($f_id, $f->notes);
+  }
+}
+
+
+#While the feature_id's SHOULD be unique, we should not die if they were not. We use an auto_increment to achieve this.
+#To retrieve the value of the id of the last inserted feature, we use LAST_INSERT_ID(), which is guaranteed to be
+#unique per session. 
+#TODO/WARNING: Are we multithreading using the same connection? the the id would not be unique... 
+sub getLastFeatureId {
+  my ($self, $username, $source) = @_;
+  
+  my $f_id = $self->dbh->prepare_cached(q(SELECT LAST_INSERT_ID() FROM `).$self->features_table_name($username, $source).q(`));
+  eval{$f_id->execute()};
+  if($@) {
+    return undef;
+  }
+  
+  my @res = $f_id->fetchrow_array();
+  return @res[0];
+}
+
+#given an array of features, this method stores
+sub addFeatures {
+  my ($self, $username, $source, $features) = @_;
+  print qq(Called DB addFeatures<br>\n) if($self->debug);
+  my $insert_feature =  $self->dbh->prepare("INSERT INTO `".$self->features_table_name($username, $source)."` VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+  for my $f (@$features) {
+     my $seg_id = $self->getSegmentId($f->segment, $username, $source);
+     eval{$insert_feature->execute($f->id, $f->label, $f->start, $f->end, $f->score, $f->orientation, $f->phase, $seg_id, $f->type_id, $f->method_id)};
+     if($@) {
+	print "There was an error when inserting: $@\n";
+      }
+  
+     my $f_id = $self->getLastFeatureId($username, $source);
+
+     $self->addLinks($f_id, $f, $username, $source);
+     $self->addNotes($f_id, $f, $username, $source);
+  }
+}
+
+
+
+
+#given an array of types, this method stores them in the right types table
+sub addTypes {
+  my ($self, $username, $source, $types) = @_;
+  print qq(Called DB addTypes<br>\n) if($self->debug);
+  
+  my $insert_type =  $self->dbh->prepare("INSERT INTO `".$self->types_table_name($username, $source)."` VALUES(?, ?, ?, ?, ?)");
+  my $insert_user_type =  $self->dbh->prepare("INSERT INTO `".$self->user_types_table_name($username)."` VALUES(?, ?, ?, ?, ?, ?)");
+
+  for my $t (@$types) {
+    $insert_type->execute($t->{'id'}, $t->{'label'}, $t->{'category'}, $t->{'cvId'}, 'FALSE');
+    if(($t->{'label'} || $t->{'cvId'}) && $self->check_type_unique($username, $t)) {
+      $insert_user_type->execute('NULL', $t->{'id'}, $t->{'label'}, $t->{'category'}, $t->{'cvId'}, 'FALSE');
+    }
+  }
+}
+
+
+#given an array of methods, this method stores them in the right methods table
+sub addMethods {
+  my ($self, $username, $source, $methods) = @_;
+  print qq(Called DB addMethods<br>\n) if($self->debug);
+ 
+  my $insert_method =  $self->dbh->prepare("INSERT INTO `".$self->methods_table_name($username, $source)."` VALUES(?, ?, ?)");
+  my $insert_user_method =  $self->dbh->prepare("INSERT INTO `".$self->user_methods_table_name($username)."` VALUES(?, ?, ?, ?)");
+
+  for my $t (@$methods) {
+    $insert_method->execute($t->{'id'}, $t->{'label'}, $t->{'cvId'});
+    if(($t->{'label'} || $t->{'cvId'}) && $self->check_method_unique($username, $t)) {
+      $insert_user_method->execute('NULL', $t->{'id'}, $t->{'label'}, $t->{'cvId'});
+    }
+  }
+}
+
+
+#Returns the info associated with the type in the user-global types table
+#returns an array of type_info
+sub getTypeInfo {
+  my ($self, $uname, $type_id) =@_;
+  
+  my $type_info = $self->dbh->prepare_cached(q(SELECT * FROM `easydas`.`).$self->user_types_table_name($uname).q(` ).
+					     q(WHERE `id` = ?));
+  eval{$type_info->execute($type_id)};
+  if($@) {
+    return [];
+  }
+  
+  my @res = $type_info->fetchrow_array(); #TODO: return more than one type_info and let the user choose
+  if($type_info->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when checking if there was previous info about the type $type_id. ).$type_info->err().qq('}});
+  }
+  return \@res;
+}
+
+#Returns the info associated with the method in the user-global methods table
+#returns an array of method_info
+sub getMethodInfo {
+  my ($self, $uname, $method_id) =@_;
+  
+  my $method_info = $self->dbh->prepare_cached(q(SELECT * FROM `easydas`.`).$self->user_methods_table_name($uname).q(` ).
+					     q(WHERE `id` = ?));
+  eval{$method_info->execute($method_id)};
+  if($@) {
+    return [];
+  }
+  
+  my @res = $method_info->fetchrow_array(); #TODO: return more than one method_info and let the user choose
+  if($method_info->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when checking if there was previous info about the method $method_id. ).$method_info->err().qq('}});
+  }
+  return \@res;
+}
+
+
+#get/set the source name
+sub source {
+  my ($self, $value) = @_;
+  $self->{'source'} = $value if(defined $value);
+  return $self->{'source'};
+}
+
+#get the dbh
+sub dbh {
+  my ($self) = shift;
+  return $self->{'dbh'};
+}
+
+sub get_source_by_name {
+  my ($self, $username, $source_name) = @_;
+
+  my $source = $self->dbh->prepare_cached('SELECT * FROM `easydas`.`Sources` WHERE `user_name` = ? AND `name` = ? LIMIT 1');
+  $source->execute($username, $source_name);
+  my @res = $source->fetchrow_array();
+  if($source->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when getting the source info. ).$source->err().qq('}});
+  }
+  return {"id"=>$res[0], "name"=>$res[1], "title"=>$res[2], "description"=>$res[3], "maintainer"=>$res[4], "doc_href"=>$res[6], "version"=>$res[7], "modification_date"=>$res[8]};
+}
+
+#Returns true iif theres no source with source_name for the user username
+sub check_source_unique {
+  my ($self, $username, $source_name) = @_;
+
+  my $unique_source = $self->dbh->prepare_cached('SELECT COUNT(*) FROM `easydas`.`Sources` WHERE `user_name` = ? AND `name` = ?');
+  $unique_source->execute($username, $source_name);
+  my @res = $unique_source->fetchrow_array();
+  if($unique_source->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when checking if the source was unique. ).$unique_source->err().qq('}});
+  }
+  return (@res[0] <= 0);
+}
+
+sub check_type_unique {
+  my ($self, $uname, $type) = @_;
+  
+  my $unique_type = $self->dbh->prepare_cached(q(SELECT COUNT(*) FROM `easydas`.`).$self->user_types_table_name($uname).q(` ).
+					       q(WHERE `id` = ? AND `label` = ? AND `cvId`= ?));
+  $unique_type->execute($type->{'id'}, $type->{'label'}, $type->{'cvId'});
+  my @res = $unique_type->fetchrow_array();
+  if($unique_type->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when checking if the type was unique. ).$unique_type->err().qq('}});
+  }
+  return (@res[0] <= 0);
+}
+
+sub check_method_unique {
+  my ($self, $uname, $method) = @_;
+  
+  my $unique_method = $self->dbh->prepare_cached(q(SELECT COUNT(*) FROM `easydas`.`).$self->user_methods_table_name($uname).q(` ).
+					       q(WHERE `id` = ? AND `label` = ? AND `cvId`= ?));
+  $unique_method->execute($method->{'id'}, $method->{'label'}, $method->{'cvId'});
+  my @res = $unique_method->fetchrow_array();
+  if($unique_method->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when checking if the method was unique. ).$unique_method->err().qq('}});
+  }
+  return (@res[0] <= 0);
+}
+
+
+sub get_source_name {
+  my ($self, $source_id) = @_;
+
+  my $query = $self->dbh->prepare_cached(q(SELECT `name` FROM `easydas`.`Sources` WHERE `id` = ?));
+  $query->execute($source_id);
+  if($query->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when checking the name of the source $source_id. ).$query->err().qq('}});
+  }
+  my @res = $query->fetchrow_array();
+ 
+  return ($res[0]);
+}
+
+###################### SOURCES ADMINISTRATION  ######################################################
+#Returns a JSON structure with sources Info
+#TODO: Return a perl object and do the JSON transformation in the callers (admin.pl)
+sub get_sources {
+    my ($self, $username) = @_;
+
+    my $sources_query = $self->dbh->prepare_cached('SELECT * FROM `easydas`.`Sources` WHERE `user_name` = ?');
+    $sources_query->execute($username);
+    if($sources_query->err()) {
+      die qq({'error': {'id': 'db_error', 'msg': 'There was an error when retrieving the sources info. ).$sources_query->err().qq('}});
+    }
+    my $server_name = $self->get_server_name($username);
+    my $sources = '[';
+    my @res;
+    while(@res = $sources_query->fetchrow_array()) {
+      $sources .= '{"id":"'.$res[0].'",'.
+		  ' "name": "'.$res[1].'",'. #TODO: Get the info from the users table
+		  ' "title": "'.$res[2].'",'.
+		  ' "description": "'.$res[3].'",'.
+		  ' "base_url": "{DASHOST}/'.$server_name.'/das/'.$res[1].'",'.
+		  ' "maintainer": "'.$res[4].'",'.
+		  ' "doc_href": "'.$res[6].'",'.
+		  ' "version": "'.$res[7].'",'.
+		  ' "coordinates_system_id": "'.$res[8].'",'.
+		  ' "coordinates_system_info": '.(($res[9])?$res[9]:'""').','. #This field is already in JSON, take into account if building something else.
+		  ' "modification_date": "'.$res[10].'",'.
+		  ' "creation_date": "'.$res[11].'",'.
+		  ' "test_range": "'.$res[12].'"},';
+    }
+    chop($sources) if(substr($sources, -1) eq ',');
+    $sources .= qq(]);
+    return $sources;
+}
+
+#Returns a JSON structure with sources Info
+#TODO: Return a perl object and do the JSON transformation in the callers (admin.pl)
+sub get_all_sources {
+    my ($self, $username) = @_;
+
+    my $sources_query = $self->dbh->prepare_cached('SELECT * FROM `easydas`.`Sources`');
+    $sources_query->execute();
+    if($sources_query->err()) {
+      die qq({'error': {'id': 'db_error', 'msg': 'There was an error when retrieving the sources info. ).$sources_query->err().qq('}});
+    }
+    my $sources = '[';
+    my @res;
+    while(@res = $sources_query->fetchrow_array()) {
+      my $server_name = $self->get_server_name($res[5]);
+      $sources .= '{"id":"'.$res[0].'",'.
+		  ' "name": "'.$res[1].'",'. #TODO: Get the info from the users table
+		  ' "title": "'.$res[2].'",'.
+		  ' "description": "'.$res[3].'",'.
+		  ' "base_url": "{DASHOST}/'.$server_name.'/das/'.$res[1].'",'.
+		  ' "maintainer": "'.$res[4].'",'.
+		  ' "doc_href": "'.$res[6].'",'.
+		  ' "version": "'.$res[7].'",'.
+		  ' "coordinates_system_id": "'.$res[8].'",'.
+		  ' "coordinates_system_info": '.(($res[9])?$res[9]:'""').','. #This field is already in JSON, take into account if building something else.
+		  ' "modification_date": "'.$res[10].'",'.
+		  ' "creation_date": "'.$res[11].'",'.
+		  ' "test_range": "'.$res[12].'",'.
+		  ' "anonymous": "'.($res[5] eq 'anonymous').'"},';
+    }
+    chop($sources) if(substr($sources, -1) eq ',');
+    $sources .= qq(]);
+    return $sources;
+}
+
+
+
+sub remove_source {
+  my ($self, $source_id, $username) = @_;
+
+  my $source_name = $self->get_source_name($source_id);
+
+  #try to remove the tables
+  my $remove_notes =$self->dbh->prepare('DROP TABLE `'.$self->notes_table_name($username, $source_name).'`');
+  my $remove_links =$self->dbh->prepare('DROP TABLE `'.$self->links_table_name($username, $source_name).'`');
+  my $remove_segments =$self->dbh->prepare('DROP TABLE `'.$self->segments_table_name($username, $source_name).'`');
+  my $remove_types =$self->dbh->prepare('DROP TABLE `'.$self->types_table_name($username, $source_name).'`');
+  my $remove_methods =$self->dbh->prepare('DROP TABLE `'.$self->methods_table_name($username, $source_name).'`');
+  my $remove_features =$self->dbh->prepare('DROP TABLE `'.$self->features_table_name($username, $source_name).'`');
+  
+  eval{$remove_notes->execute()};
+  eval{$remove_links->execute()};
+  eval{$remove_segments->execute()};
+  eval{$remove_types->execute()};
+  eval{$remove_methods->execute()};
+  eval{$remove_features->execute()};
+  if($remove_types->err() or $remove_segments->err() or $remove_links->err() or $remove_notes->err() or $remove_methods->err()) {
+      die qq({'error': {'id': 'db_error', 'msg': 'There was an error when removing the tables associated with the source "$source_name". ).$remove_types->err().qq('}}); #Todo: ethe error could have happened onthe onther one!
+  }
+  
+  my $sources_query = $self->dbh->prepare_cached('DELETE FROM `easydas`.`Sources` WHERE `Sources`.`id` = ? LIMIT 1');
+  $sources_query->execute($source_id);
+  if($sources_query->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when removing the source "$source_id" from the Sources table. ).$sources_query->err().qq('}});
+  }
+  return 1;
+}
+
+sub get_server_name {
+  my ($self, $username) = @_;
+  return $self->{'server_names'}->{$username} if(defined($self->{'server_names'}->{$username}));
+  my $user = $self->dbh->prepare_cached('SELECT server_name FROM `easydas`.`Users` WHERE `login` = ? LIMIT 1');
+  $user->execute($username);
+  my @res = $user->fetchrow_array();
+  if($user->err()) {
+    die qq({'error': {'id': 'db_error', 'msg': 'There was an error when getting the user info. ).$user->err().qq('}});
+  }
+  $self->{'server_names'}->{$username} = $res[0];
+  return $res[0];
+}
+
+#creates a viable test region by analising the feature positions.
+sub get_test_range{
+  my ($self, $features) = @_;
+
+  my $test_region = "1:0,1000";
+
+  my $i = 0;
+  my $f = $features->[$i];
+  my $num_feats = $features;
+  my $found = 0;
+  while(!$found && $i<$features) {
+     if($f->start != 0 && $f->end != 0)  {
+	#note that we want to use the segment NAME here
+	$test_region = $f->segment.":".$f->start."-".($f->start+$TEST_REGION_MAX_LENGTH); 
+	$found = 1;
+     }
+     $i++;
+     $f=$features->[$i];
+  }
+  return $test_region;
+}
+
+#######################  SQL CODE  ############################################
+#TODO: Should change username by user id??
+sub create_features_table_sql {
+  my ($self, $uname, $source) = @_;
+  my $tname = $self->features_table_name($uname, $source);
+  my $sql = "CREATE TABLE IF NOT EXISTS `$tname` (".<<'EOT';
+    `id` int(11) NOT NULL auto_increment,
+    `feature_id` varchar(50) NOT NULL,
+    `label` tinytext,
+    `start` int(11),
+    `end` int(11),
+    `score` float default NULL,
+    `orientation` enum('+','0','-') default NULL,
+    `phase` enum('-','0','1','2') default NULL,
+    `segment_id` smallint(6) NOT NULL,
+    `type_id` varchar(50) NOT NULL COMMENT 'The identifier of the feature type',
+    `method_id` VARCHAR( 50 ) NULL,
+    PRIMARY KEY  (`id`)
+  ) ENGINE=MyISAM  DEFAULT CHARSET=latin1 COMMENT='Information on the features of a source.';
+EOT
+ return $sql; 
+}
+
+sub features_table_name {
+  my ($self, $uname, $source) = @_;
+    return $self->get_server_name($uname)."#$source#Features";
+}
+
+#Source specific types
+sub create_types_table_sql {
+  my ($self, $uname, $source) = @_;
+  my $tname = $self->types_table_name($uname, $source);
+  my $sql = "CREATE TABLE IF NOT EXISTS `$tname` (".<<'EOT';
+    `id` varchar(50) NOT NULL,
+    `label` tinytext,
+    `category` mediumtext,
+    `cvId` tinytext,
+    `reference` tinyint(1) DEFAULT NULL,
+    PRIMARY KEY (`id`)
+    ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='definition of the types used in the source. On table per source';
+EOT
+ return $sql; 
+}
+
+sub types_table_name {
+  my ($self, $uname, $source) = @_;
+  return $self->get_server_name($uname)."#$source#Types";
+}
+
+
+#Source specific Methods
+sub create_methods_table_sql {
+  my ($self, $uname, $source) = @_;
+  my $tname = $self->methods_table_name($uname, $source);
+  my $sql = "CREATE TABLE IF NOT EXISTS `$tname` (".<<'EOT';
+    `id` varchar(50) NOT NULL,
+    `label` tinytext,
+    `cvId` tinytext,
+    PRIMARY KEY (`id`)
+    ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='definition of the methods used in the source. On table per source';
+EOT
+ return $sql; 
+}
+
+sub methods_table_name {
+  my ($self, $uname, $source) = @_;
+  return $self->get_server_name($uname)."#$source#Methods";
+}
+
+
+
+
+#Source specific segments
+
+sub create_segments_table_sql {
+  my ($self, $uname, $source) = @_;
+  my $tname = $self->segments_table_name($uname, $source);
+  my $sql = "CREATE TABLE IF NOT EXISTS `$tname` (".<<'EOT';
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `entry_point` tinytext NOT NULL COMMENT 'The name of the entry point this segment represents.',
+    `version` tinytext NOT NULL,
+    `label` tinytext NOT NULL,
+    PRIMARY KEY (`id`)
+  ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='segments used in the source. One Table Per Source' AUTO_INCREMENT=1 ;
+EOT
+ return $sql; 
+}
+
+sub segments_table_name {
+  my ($self, $uname, $source) = @_;
+  return $self->get_server_name($uname)."#$source#Segments";
+}
+  
+#Source specific Links
+sub create_links_table_sql {
+  my ($self, $uname, $source) = @_;
+  my $tname = $self->links_table_name($uname, $source);
+  my $sql = "CREATE TABLE IF NOT EXISTS `$tname` (".<<'EOT';
+    `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+    `feat_id` INT NOT NULL ,
+    `href` TINYTEXT NOT NULL ,
+    `label` TINYTEXT NULL ,
+    INDEX ( `feat_id` )
+    ) ENGINE = MYISAM ;
+EOT
+ return $sql; 
+}
+
+sub links_table_name {
+  my ($self, $uname, $source) = @_;
+  return $self->get_server_name($uname)."#$source#Links";
+}
+
+#Source specific Notes
+sub create_notes_table_sql {
+  my ($self, $uname, $source) = @_;
+  my $tname = $self->notes_table_name($uname, $source);
+  my $sql = "CREATE TABLE IF NOT EXISTS `$tname` (".<<'EOT';
+    `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+    `feat_id` INT NOT NULL ,
+    `text` TINYTEXT NOT NULL
+     ) ENGINE = MYISAM ;
+EOT
+ return $sql; 
+}
+
+sub notes_table_name {
+  my ($self, $uname, $source) = @_;
+  return $self->get_server_name($uname)."#$source#Notes";
+}
+
+
+
+#Global user types
+sub user_types_table_name {
+  my ($self, $uname) = @_;
+  
+  return $self->get_server_name($uname)."#Types";
+}
+
+sub create_user_types_table_sql {
+  my ($self, $uname) = @_;
+  my $tname = $self->user_types_table_name($uname);
+  my $sql = qq(CREATE TABLE IF NOT EXISTS `$tname` (
+  `global_user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` varchar(50) NOT NULL,
+  `label` tinytext,
+  `category` mediumtext,
+  `cvId` tinytext,
+  `reference` tinyint(1) DEFAULT NULL,
+  PRIMARY KEY (`global_user_id`)
+  ) ENGINE=MyISAM  DEFAULT CHARSET=latin1 COMMENT='definition of the types used globally by the user');
+ return $sql; 
+}
+
+
+
+#Global user methods
+sub user_methods_table_name {
+  my ($self, $uname) = @_;
+  
+  return $self->get_server_name($uname)."#Methods";
+}
+
+sub create_user_methods_table_sql {
+  my ($self, $uname) = @_;
+  my $tname = $self->user_methods_table_name($uname);
+  my $sql = qq(CREATE TABLE IF NOT EXISTS `$tname` (
+  `global_user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `id` varchar(50) NOT NULL,
+  `label` tinytext,
+  `cvId` tinytext,
+  PRIMARY KEY (`global_user_id`)
+  ) ENGINE=MyISAM  DEFAULT CHARSET=latin1 COMMENT='definition of the methods used globally by the user');
+ return $sql; 
+}
+
+
+1;

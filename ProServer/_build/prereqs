@@ -1,0 +1,36 @@
+do{ my $x = {
+       'build_requires' => {
+                             'Test::More' => 0
+                           },
+       'conflicts' => {},
+       'requires' => {
+                       'Compress::Zlib' => '2.005',
+                       'POE::Filter::HTTPD' => '1.2188',
+                       'File::Spec' => '3.12',
+                       'CGI' => '3.15',
+                       'POSIX' => '1.08',
+                       'HTML::Entities' => '1.27',
+                       'POE::Wheel::SocketFactory' => '1.2194',
+                       'Socket' => '1.77',
+                       'Getopt::Long' => '2.34',
+                       'Readonly' => '1.03',
+                       'HTTP::Date' => '1.47',
+                       'POE::Wheel::ReadWrite' => '1.2199',
+                       'HTTP::Response' => '1.53',
+                       'HTTP::Request' => '1.4',
+                       'Sys::Hostname' => '1.11',
+                       'POE' => '0.9999'
+                     },
+       'recommends' => {
+                         'Bio::DB::Flat' => 0,
+                         'Bio::EnsEMBL::DBSQL::DBAdaptor' => 0,
+                         'Net::IP' => '1.25',
+                         'Bio::EnsEMBL::Registry' => 0,
+                         'Bio::SeqIO' => 0,
+                         'Cache::Cache' => '1.05',
+                         'LWP::UserAgent' => '2.033',
+                         'Bio::Das::Lite' => '1.051',
+                         'DBI' => '1.52'
+                       }
+     };
+$x; }

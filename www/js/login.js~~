@@ -1,0 +1,356 @@
+/**
+ * @author bernat gel
+ */
+
+/**Contains all forms used throught the application*/ 
+var easyDAS = (easyDAS)?easyDAS:{};
+
+//CGI CHANGE: move all ../cgi-bin to cgi-bin
+
+(function() {
+	//Private Attributes
+	var periodicalChecker;
+	
+	var isFirstCheck = true;
+	
+	//Private functions
+	/**Callback function to be called when a login attempt is made. It will show any error message if failed attempt or
+	 * update the login div to reflect the logged in status
+	 * 
+	 * @param {Object} response
+	 */ 
+	var login_callback = function(response) {
+		if(response.error || !response.username) {
+			var msg;
+			if(response.error === 'invalid') {
+				msg = "The username or password are invalid. Are you registered?";
+			} else {
+				msg = "There was a server error. Please, try again.";
+			}
+			log.login_msg('<span class="invalid">'+msg+'</span>');
+		} else {
+			easyDAS.username = response.username;
+			log.setLoginEnv(true);
+			periodicalChecker = setInterval(function(){
+				log.getLoginStatus(function(response){
+					if (!response.loggedin) 
+						easyDAS.Controller.notifyUnexpectedDesconnection();
+				});
+			}, 60000);
+		}
+	};
+	
+	/**Login function. It calls the login script in the server*/
+	var classic_login = function() {
+		var data = {
+			username: $('#classic_username').val(),
+			password: $('#classic_password').val(),
+			cmd: 'login'
+		};
+		log.closeLoginWindow();
+		
+		$.get('../cgi-bin/login.pl', data, login_callback, 'json');//
+		return false;
+	};
+	var openid_login = function(uid) {
+		log.closeLoginWindow();
+		easyDAS.Utils.GUI.openPopupWindow('../cgi-bin/openid_begin.pl?uid='+encodeURIComponent(uid), 'openid_popup');
+	};
+	var google_login = function() {
+		var uid = "https://www.google.com/accounts/o8/id";
+		log.closeLoginWindow();
+		easyDAS.Utils.GUI.openPopupWindow('../cgi-bin/openid_begin.pl?uid='+encodeURIComponent(uid), 'openid_popup');
+	};
+	
+	/**Logout function*/
+	var logout_function = function() {
+		$.get('../cgi-bin/login.pl', {'cmd': 'logout'}, function() {}, 'json')
+		easyDAS.username = undefined;
+		log.setLoginEnv(false);
+		clearInterval(periodicalChecker);
+		//TODO: NOtify controller. It sould remove the MySources
+	};
+	
+	var required_user_info = function(){
+		if (!$('#email').val()) {
+			alert("email is a required field");
+			return false;
+		}
+		if (!$('#server_name').val()) {
+			alert("the server name is required");
+			return false;
+		}
+		return true;
+	};
+	
+	//Registers a user with the info given in the register form
+	var register_classic = function() {
+		if(!required_user_info()) return;
+		
+		if($('#reg_classic_password').val() == '') {
+			alert("A password is needed!");
+		} else if($('#reg_classic_password').val() != $('#reg_classic_password2').val()) {
+			alert("passwords are different!");
+		} else {
+			var data = {
+				username: $('#reg_classic_username').val(),
+				password: $('#reg_classic_password').val(),
+				cmd: 'register_classic',
+				email: $('#email').val(),
+				server_name: $('#server_name').val()
+			};
+			var callback = function(response) {
+				//TODO: create the correct GUI
+				alert("The user have been registered.");
+				log.closeLoginWindow();
+				log.setLoginEnv(true);
+			};
+			$.get('../cgi-bin/login.pl', data, callback, 'json');
+		}
+	};
+	var register_openid = function() {
+		if(!required_user_info()) return;
+		
+		if($('#reg_openid_uid').val() == '') {
+			alert("An openid user identifier (url) is needed!");
+		} else {		
+			var uid = $('#reg_openid_uid').val();
+			var email = $('#email').val();
+			var server_name = $('#server_name').val();
+			easyDAS.Utils.GUI.openPopupWindow('../cgi-bin/openid_begin.pl?email='+email+'&server_name='+server_name+'&cmd=register&uid='+encodeURIComponent(uid), 'openid_popup');
+			log.closeLoginWindow();
+		}
+	};
+	var register_google = function() {
+		if(!required_user_info()) return;
+		
+		var uid = $('#reg_openid_uid').val();
+		var email = $('#email').val();
+		var server_name = $('#server_name').val();
+		easyDAS.Utils.GUI.openPopupWindow('../cgi-bin/openid_begin.pl?email='+email+'&server_name='+server_name+'&cmd=register&uid='+encodeURIComponent('https://www.google.com/accounts/o8/id)'), 'openid_popup');
+		log.closeLoginWindow();
+	};
+	
+	//checks if there is another user with the same name
+	var check_username = function() {
+		var username = $('#reg_classic_username').val();
+		if (username) {
+			var data = {
+				username: username,
+				cmd: 'check_username'
+			}
+			var callback = function(response){
+				if(response.valid) {
+					$('#reg_classic_username').removeClass('invalid_field').addClass('valid_field');
+				} else {
+					$('#reg_classic_username').removeClass('valid_field').addClass('invalid_field');
+				}
+			}
+			$.get('../cgi-bin/login.pl', data, callback, 'json');
+		}
+	};
+	var check_server_name = function() {
+		var sn = $('#server_name').val();
+		if (sn) {
+			var data = {
+				server_name: sn,
+				cmd: 'check_server_name'
+			}
+			var callback = function(response){
+				if(response.valid) {
+					$('#server_name').removeClass('invalid_field').addClass('valid_field');
+				} else {
+					$('#server_name').removeClass('valid_field').addClass('invalid_field');
+				}
+			}
+			$.get('../cgi-bin/login.pl', data, callback, 'json');
+		}
+	}
+	
+	/**Login Window**/
+	var initLoginWindow = function(){
+		//move it
+		var margin = ($(window).width() - 900)/2;
+		$('#login_window').css({"left": margin, "top": 40});
+		//close button
+		$('#login_close').click(log.closeLoginWindow);
+		initLoginForm();
+		initRegisterForm();
+	};
+	var initLoginForm = function() {
+		//Classic Login
+		$('#classic_login_button').click(classic_login);
+		$('#classic_username').keyup(function(event){
+			if (event.keyCode == 13) {
+				if($('#classic_password').val() != "") 
+					classic_login; //if there's password, submit
+				else 
+					$('#classic_password').focus(); //else, move to password
+			} 
+		});
+		$('#classic_password').keyup(function(event){
+			if (event.keyCode == 13) 
+				classic_login();
+		});
+		//OpenID
+		$('#openid_login_button').click(function() {
+			openid_login($('#openid_uid').val());
+		});
+		$('#openid_uid').keyup(function(event){
+			if (event.keyCode == 13) 
+				openid_login($('#openid_uid').val());
+		});
+		//Google
+		$('#google_login_button').click(google_login);
+	};	
+	var initRegisterForm = function() {
+		$('#email').blur(function() {
+			if (!$('#email').val().match(/[a-z0-9._-]+@[a-z0-9._-]+.[a-z]+/gi)) {
+				$('#email').removeClass('valid_field').addClass('invalid_field');
+			} else {
+				$('#email').removeClass('invalid_field').addClass('valid_field');
+			}
+		});
+		$('#server_name').blur(check_server_name);
+		$('#reg_classic_username').blur(check_username);
+		$('#reg_classic_button').click(register_classic);
+		$('#reg_openid_button').click(register_openid);
+		$('#reg_google_button').click(register_google);
+	};
+	/**Logout Form */
+	var initLogoutForm = function() {
+		$('#login_div #logout_link').click(logout_function);
+		$('#my_data').click(easyDAS.Controller.showMyData);
+		$('#login_div .username').click(easyDAS.Controller.showMyData);
+	};
+	/**Register Function*/
+	var open_register_window = function() {
+		var window = $('#register_div');
+		if (window.length < 1) {
+			//Create a "Floating Window". 
+			//TODO: Change the interface!
+			window = $('<div id="register_div" class="floating round shadow frame"></div>').appendTo($('body'));
+			window.append('<label for="register_username">Username</label><input id="register_username" name="register_username" /><br>');
+			window.append('<label for="register_password" >Password</label><input id="register_password" name="register_password" /><br>');
+			window.append('<label for="register_reppassword" >Repeat Password</label><input id="register_reppassword" name="register_reppassword" /><br>');
+			window.append('<button id="register_close">Close</button> <button id="register_register">Register</button>');
+			//initialize
+			$('#register_username').blur(check_username);
+			$('#register_register').click(register);
+			$('#register_close').click(function(){
+				closeRegisterWindow();
+			});
+		}
+		window.show();
+	};
+	var closeRegisterWindow = function() {
+		$('#register_div').remove();
+	};
+	
+	//HTML
+	//Return the login HTML
+	var getLoginHTML = function(){
+		/*return '<div class="title_bar round">Log In</div>'
+		       +'Sign in using either:<br>'
+			   +'<label for="username">Username</label><input id="classic_username" name="classic_username"\><br>'
+			   +'<label for="password">Password</label><input type="password" id="classic_password" name="classic_password"\><button id="classic_login_button">Log In</button><br>'
+			   +'new user? <span id="register_button" class="link_like">Register</span>'
+			   +'<hr>'
+			   +'<label for="openid_uid">or openID <img src="images/openid.png" height="16" width="16" ><input id="openid_uid" name="openid_uid"\><button id="openid_login_button">OpenID Log In</button><br>'
+			   +'<label for="google_login_button"><button id="google_login_button"><img src="http://www.google.com/favicon.ico" style="vertical-align: center;"> Google Account</button><br>'	
+			   +'<div class="buttons"><button id="login_close">Close</button></div>';
+			   */ 
+	};
+	var getLogoutHTML = function() {
+		return '<div id="callback_response">You are logged in as <span class="username">'+easyDAS.username+'</span><span id="logout_link" class="link_like">Logout</span>';
+	};
+	var getLoginButtonHTML = function() {
+		return '<span id="login_button" class="link_like">Login</span>';
+	};
+	
+	
+	
+	
+	var log = {
+		getLoginStatus: function(callback) {
+			//TODO: if there is no sessionID cookie... do not send the request.
+			$.get('../cgi-bin/login.pl', {'cmd':'check'}, callback, 'json');
+		},
+		//Checks if there's a session and it's valid and sets the appropiate (login/logout) form.
+		check: function(callback) {
+			var cb = function(response){
+				if (response.loggedin) {
+					easyDAS.username  = response.username;
+					log.setLoginEnv(true);
+					callback && callback({loggedin: true});
+				}
+				else {
+					log.setLoginEnv(false);
+					callback && callback({loggedin: false});
+				}
+			};
+			log.getLoginStatus(cb);
+		},
+		/**Sets the enviroment accordig to the "logged" status of the user
+		 * 
+		 * @param {Object} logged - true if logged in, false otherwise
+		 */
+		setLoginEnv: function(logged){
+			if(logged) {
+				log.setLogoutForm();
+				if (isFirstCheck) {
+					easyDAS.Controller.selectTab('my_sources_panel'); //if we start the application being already logged in, select the my_sources tab
+					isFirstCheck = false;
+				}
+				easyDAS.Controller.enableTab('my_sources_panel');
+			} else {
+				log.setLoginButton();
+				easyDAS.Controller.disableTab('my_sources_panel');
+			}
+		},
+		//Public functions
+		setLoginButton: function() {
+			$('#login_div').html(getLoginButtonHTML());
+			$('#login_button').click(log.openLoginWindow);
+		},
+		openLoginWindow: function(){
+			var window = $('#login_window');
+			if (window.length < 1) { //since the window HTML is now embedded in the page, this code is never executed
+				//Create a "Floating Window". 
+				window = $('<div id="login_window" class="dialog floating round shadow frame"></div>').appendTo($('body'));
+				window.html(getLoginHTML());
+			}
+			if(!login_window_inited) {
+				window.draggable();
+				initLoginWindow();			
+			}
+			initLoginWindow(); //OOOOOOOOOOOOOOOOOOOO
+			window.show();
+			$('#login_button').attr('disabled', 'disabled');
+			
+		},
+		closeLoginWindow: function(){
+			$('#login_window').hide();
+			$('#login_button').removeAttr('disabled');
+		},
+		setLogoutForm: function(username){
+			$('#login_div').html(getLogoutHTML());
+			initLogoutForm();
+		},
+		handleOpenIDResponse: function(openid_args) {
+  			$.get('cgi-bin/login.pl?cmd=openid_check&'+openid_args, {}, login_callback, 'json'); //resend the openid response to the server to check if they are correct.
+		},
+		login_msg: function(msg) {
+			var div = $('#login_msg');
+			if(div.length<1) div = $('<div id="login_msg"></div>').appendTo('#login_div');
+			div.html(msg);
+		},
+	}
+	easyDAS.Login = log;
+}());
+
+//Register to be called on document ready
+$(document).ready(function(){
+	easyDAS.Login.check();
+});	
+	
